@@ -23,28 +23,6 @@ ADOBE_PREVIEW_PAT = re.compile(
     re.IGNORECASE,
 )
 
-BLINDTEXT_PAT = re.compile(
-    r"("
-    r"lorem\s+ipsum"
-    r"|consectetur\s+adipiscing"
-    r"|sed\s+do\s+eiusmod"
-    r"|duis\s+aute\s+irure"
-    r"|typoblindtext"
-    r"|blindtext"
-    r"|beispieltext"
-    r"|platzhaltertext"
-    r"|mustertext"
-    r"|dies\s+ist\s+ein\s+(typoblindtext|beispiel|muster|platzhalter)"
-    r"|hier\s+(steht|folgt)\s+(ein\s+)?(text|inhalt|platzhalter)"
-    r"|text\s+folgt\s+in\s+k.rze"
-    r"|coming\s+soon"
-    r"|under\s+construction"
-    r"|gallia\s+est\s+omnis"
-    r"|ullam\s+corporis"
-    r")",
-    re.IGNORECASE,
-)
-
 def make_session():
     s = rq.Session()
     s.headers["User-Agent"] = "Mozilla/5.0 (compatible; PreLaunchChecker/1.0)"
@@ -81,6 +59,20 @@ def normalize(base, href):
 def same_domain(base, url):
     return urlparse(url).netloc == urlparse(base).netloc
 
+def is_html_url(url):
+    """Gibt False zurück wenn die URL auf eine Nicht-HTML-Ressource zeigt (Bild, Dokument, etc.)."""
+    NON_HTML_EXT = {
+        'jpg','jpeg','png','gif','webp','svg','ico','bmp','tiff','avif',
+        'pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','csv',
+        'zip','rar','gz','tar','7z',
+        'mp3','mp4','wav','ogg','avi','mov','wmv','flv','webm',
+        'woff','woff2','ttf','eot','otf',
+        'js','css','xml','json','rss','atom',
+    }
+    path = urlparse(url).path.lower()
+    ext = path.rsplit('.', 1)[-1] if '.' in path.split('/')[-1] else ''
+    return ext not in NON_HTML_EXT
+
 def filename_from_url(url):
     path = urlparse(url).path
     return path.split("/")[-1] if "/" in path else path
@@ -115,19 +107,6 @@ def check_adobe_preview(html, url):
             seen.add(h["img_url"])
             unique.append(h)
     return unique[:30]
-
-def check_blindtext(text_content):
-    """Sucht nach Blindtext-Fragmenten im sichtbaren Seitentext."""
-    hits = []
-    seen = set()
-    for m in BLINDTEXT_PAT.finditer(text_content):
-        start = m.start()
-        snippet = text_content[max(0, start - 30): start + 120].strip()
-        key = m.group(0).lower()
-        if key not in seen:
-            seen.add(key)
-            hits.append(snippet[:200])
-    return hits[:10]
 
 def check_favicon(soup, origin, session):
     link_tag = soup.find("link", rel=lambda r: r and any(
@@ -226,7 +205,7 @@ def crawl(start_url: str, max_pages: int, job_id: str):
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for a in soup.find_all("a", href=True):
                     href = normalize(url, a["href"])
-                    if href and same_domain(start_url, href) and href not in visited:
+                    if href and same_domain(start_url, href) and href not in visited and is_html_url(href):
                         queue.append(href)
         pages.append(page)
         with lock:
@@ -335,6 +314,7 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             page_links.append(href)
             if href not in all_links:
                 all_links[href] = []
+            # Maximal 5 Quellen pro Link speichern
             if len(all_links[href]) < 5:
                 all_links[href].append({
                     "page_url": p["url"],
@@ -348,15 +328,6 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             "found": len(adobe_hits) > 0,
             "count": len(adobe_hits),
             "samples": adobe_hits,
-        }
-
-        # Blindtext
-        text_content = soup.get_text(" ", strip=True)
-        blindtext_samples = check_blindtext(text_content)
-        checks["blindtext"] = {
-            "found": len(blindtext_samples) > 0,
-            "count": len(blindtext_samples),
-            "samples": blindtext_samples,
         }
 
         # Favicon + Apple Touch Icon (nur erste Seite)
@@ -377,9 +348,10 @@ def crawl(start_url: str, max_pages: int, job_id: str):
     with lock:
         jobs[job_id]["progress"] = 80
 
-    # Broken Link Check – mit Quellseite + Ankertext
+    # Broken Link Check – nur interne Links, mit Quellseite + Ankertext
     broken_links = []
-    for lnk, sources in list(all_links.items())[:80]:
+    internal_links = {lnk: src for lnk, src in all_links.items() if same_domain(start_url, lnk)}
+    for lnk, sources in list(internal_links.items())[:80]:
         try:
             r = session.head(lnk, timeout=8, allow_redirects=True)
             if r.status_code >= 400:
