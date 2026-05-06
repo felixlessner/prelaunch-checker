@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Website Pre-Launch Checker</title>
+  <title>Website Checker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     *{font-family:system-ui,sans-serif;box-sizing:border-box;}
@@ -43,16 +43,16 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     </div>
     <div>
-      <div style="font-weight:700;font-size:17px;">Pre-Launch Checker</div>
-      <div style="font-size:11px;color:#64748b;">Website-Qualitaetscheck vor dem Livegang</div>
+      <div style="font-weight:700;font-size:17px;">Website Checker</div>
+      <div style="font-size:11px;color:#64748b;">Website-Qualitätscheck</div>
     </div>
   </div>
 </header>
 
 <main style="max-width:1200px;margin:0 auto;padding:32px 24px;">
   <div class="card fade-in" style="padding:32px;margin-bottom:28px;">
-    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;">Website pruefen</h2>
-    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">URL eingeben und auf alle relevanten SEO- und technischen Merkmale pruefen lassen.</p>
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;">Website prüfen</h2>
+    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">URL eingeben und auf alle relevanten Merkmale prüfen lassen.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
       <div style="flex:1;min-width:260px;">
         <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500;">Website-URL</label>
@@ -60,7 +60,7 @@
       </div>
       <div style="width:130px;">
         <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500;">Max. Seiten</label>
-        <input type="number" id="maxPages" value="20" min="1" max="100" style="width:100%;"/>
+        <input type="number" id="maxPages" value="50" min="1" max="100" style="width:100%;"/>
       </div>
       <button onclick="startCheck()" style="background:#2563eb;color:#fff;border:none;padding:11px 28px;border-radius:8px;font-size:14px;font-weight:600;white-space:nowrap;">
         &#9654; Analyse starten
@@ -74,14 +74,14 @@
       <span style="color:#64748b;font-size:14px;" id="progressPct">0%</span>
     </div>
     <div style="background:rgba(255,255,255,0.08);border-radius:3px;"><div class="bar-fill" id="progressBar" style="width:0%;"></div></div>
-    <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Dies kann je nach Seitengroesse einige Minuten dauern.</p>
+    <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Dies kann je nach Seitengröße einige Minuten dauern.</p>
   </div>
 
   <div id="resultsSection" style="display:none;">
     <div id="summaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:28px;"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="tab active" onclick="showTab('overview')" id="tab-overview">Uebersicht</button>
+      <button class="tab active" onclick="showTab('overview')" id="tab-overview">Übersicht</button>
       <button class="tab inactive" onclick="showTab('pages')" id="tab-pages">Seiten-Details</button>
       <button class="tab inactive" onclick="showTab('broken')" id="tab-broken">Broken Links</button>
       <button class="tab inactive" onclick="showTab('adobe')" id="tab-adobe">Adobe Stock</button>
