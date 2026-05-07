@@ -406,3 +406,22 @@ def health():
 def index():
     with open("templates/index.html", encoding="utf-8") as f:
         return f.read()
+
+# Ganz unten in main.py hinzufügen:
+
+from api import register_routes
+
+register_routes(
+    app=app,
+    make_session=make_session,
+    safe_get=safe_get,
+    safe_head=safe_head,
+    normalize=normalize,
+    same_domain=same_domain,
+    is_html_url=is_html_url,
+    filename_from_url=filename_from_url,
+    check_adobe_preview=check_adobe_preview,
+    check_favicon=check_favicon,
+    check_apple_touch_icon=check_apple_touch_icon,
+)
+
