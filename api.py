@@ -1,9 +1,10 @@
 """
 Synchronous API for Pre-Launch Checker.
 
-Stellt ein Endpoint bereit:
+Stellt zwei Endpoints bereit:
 
-    GET /api/v1/check
+    GET  /api/v1/check
+    POST /api/v1/check
 
 Input (JSON-Body):
     {
@@ -19,17 +20,23 @@ Output:
         "crawled_count": 10
     }
 
+Authentifizierung:
+    - Header: "x-api-key: <DEIN_API_KEY>"
+    - Erwarteter Wert kommt aus der Umgebungsvariable API_KEY.
+      Ist API_KEY nicht gesetzt, ist die API ungeschützt (z.B. für lokale Entwicklung).
+
 Die eigentliche Logik (HTTP-Session, HTML-Parsing, etc.) wird aus main.py
 per Dependency Injection hereingereicht (siehe register_routes in main.py),
 dadurch vermeiden wir zirkuläre Importe.
 """
 
-from typing import Any, Dict, List, Set, Callable
-from urllib.parse import urlparse
+import os
 import re
+from typing import Any, Dict, List, Set, Callable, Optional
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
-from fastapi import Body, HTTPException
+from fastapi import Body, HTTPException, Depends, Header
 from pydantic import BaseModel, HttpUrl, Field
 
 
@@ -38,7 +45,7 @@ class CheckRequest(BaseModel):
     Request-Body für den synchronen Check-Endpoint.
 
     Beachte:
-    - Feldname im JSON ist "URL" (wie von dir gewünscht).
+    - Feldname im JSON ist "URL".
     - In Python arbeiten wir mit dem Attribut "url".
     """
 
@@ -63,11 +70,46 @@ def register_routes(
     check_apple_touch_icon: Callable[[Any, str, Any], Dict[str, Any]],
 ) -> None:
     """
-    Wird von main.py aufgerufen und hängt die Route an das bestehende FastAPI-App-Objekt.
+    Wird von main.py aufgerufen und hängt die Routen an das bestehende FastAPI-App-Objekt.
 
     Wichtig: Keine Importe von main.py hier drin – alle Abhängigkeiten werden
     von außen übergeben. So gibt es keinen zirkulären Import.
     """
+
+    # ------------------------------------------------------------------
+    # API-Key-Authentifizierung
+    # ------------------------------------------------------------------
+
+    API_KEY_ENV_NAME = "API_KEY"
+
+    def verify_api_key(
+        x_api_key: Optional[str] = Header(
+            default=None,
+            description="API key for authentication",
+        )
+    ) -> None:
+        """
+        Prüft den API-Key aus dem Header `x-api-key`.
+
+        - Erwarteter Key kommt aus der Umgebungsvariable API_KEY.
+        - Ist API_KEY nicht gesetzt oder leer, wird NICHT geprüft
+          (praktisch für lokale Entwicklung).
+        """
+        expected = os.getenv(API_KEY_ENV_NAME)
+
+        # Kein API-Key konfiguriert -> kein Schutz (Dev-Modus)
+        if not expected:
+            return
+
+        if x_api_key != expected:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or missing API key",
+            )
+
+    # ------------------------------------------------------------------
+    # Crawl- und Check-Logik (unverändert)
+    # ------------------------------------------------------------------
 
     def run_checks(start_url: str, max_pages: int = 20) -> Dict[str, Any]:
         """
@@ -322,8 +364,15 @@ def register_routes(
             "crawled_count": len(results),
         }
 
+    # ------------------------------------------------------------------
+    # Routen: GET + POST /api/v1/check (mit API-Key-Schutz)
+    # ------------------------------------------------------------------
+
     @app.get("/api/v1/check")
-    def api_v1_check(payload: CheckRequest = Body(...)) -> Dict[str, Any]:
+    def api_v1_check_get(
+        payload: CheckRequest = Body(...),
+        _: None = Depends(verify_api_key),
+    ) -> Dict[str, Any]:
         """
         Führt den Prelaunch-Check synchron aus und gibt das Ergebnis zurück.
 
@@ -332,8 +381,10 @@ def register_routes(
                 "URL": "https://example.com",
                 "max_pages": 20
             }
-        """
 
+        Authentifizierung:
+            Header: x-api-key: <DEIN_API_KEY>
+        """
         try:
             result = run_checks(
                 start_url=str(payload.url),
@@ -341,6 +392,33 @@ def register_routes(
             )
         except Exception as exc:
             # Safety-Net, damit der Client eine ordentliche Fehlermeldung bekommt
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+        return result
+
+    @app.post("/api/v1/check")
+    def api_v1_check_post(
+        payload: CheckRequest = Body(...),
+        _: None = Depends(verify_api_key),
+    ) -> Dict[str, Any]:
+        """
+        POST-Variante des synchronen Prelaunch-Checks.
+
+        Request (JSON-Body):
+            {
+                "URL": "https://example.com",
+                "max_pages": 20
+            }
+
+        Authentifizierung:
+            Header: x-api-key: <DEIN_API_KEY>
+        """
+        try:
+            result = run_checks(
+                start_url=str(payload.url),
+                max_pages=payload.max_pages,
+            )
+        except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
         return result
