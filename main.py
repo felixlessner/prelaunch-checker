@@ -7,9 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests as rq
 from bs4 import BeautifulSoup
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(os.path.join("static", "favicon.ico"))
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 jobs: dict = {}
 lock = threading.Lock()
