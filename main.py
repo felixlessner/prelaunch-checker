@@ -13,6 +13,8 @@ import os
 from typing import Optional
 from db import init_db, save_check_to_db
 
+VERSION = "1.0.0"
+
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -438,7 +440,10 @@ def get_status(job_id: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": VERSION,
+        }
 
 @app.get("/", response_class=HTMLResponse)
 def index():
