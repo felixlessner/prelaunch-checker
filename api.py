@@ -32,25 +32,24 @@ dadurch vermeiden wir zirkuläre Importe.
 
 import os
 import re
+import uuid
 from typing import Any, Dict, List, Set, Callable, Optional
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from fastapi import Body, HTTPException, Depends, Header
 from pydantic import BaseModel, HttpUrl, Field
+from db import save_check_to_db
 
 
 class CheckRequest(BaseModel):
     """
     Request-Body für den synchronen Check-Endpoint.
-
-    Beachte:
-    - Feldname im JSON ist "URL".
-    - In Python arbeiten wir mit dem Attribut "url".
     """
 
     url: HttpUrl = Field(alias="URL")
     max_pages: int = 20
+    customer_id: Optional[str] = None
 
     class Config:
         populate_by_name = True  # erlaubt auch "url" im JSON, falls gewünscht
@@ -375,15 +374,6 @@ def register_routes(
     ) -> Dict[str, Any]:
         """
         Führt den Prelaunch-Check synchron aus und gibt das Ergebnis zurück.
-
-        Request (JSON-Body):
-            {
-                "URL": "https://example.com",
-                "max_pages": 20
-            }
-
-        Authentifizierung:
-            Header: x-api-key: <DEIN_API_KEY>
         """
         try:
             result = run_checks(
@@ -391,10 +381,23 @@ def register_routes(
                 max_pages=payload.max_pages,
             )
         except Exception as exc:
-            # Safety-Net, damit der Client eine ordentliche Fehlermeldung bekommt
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+        check_id = str(uuid.uuid4())
+        try:
+            save_check_to_db(
+                check_id=check_id,
+                start_url=str(payload.url),
+                customer_id=payload.customer_id,
+                result=result,
+                status="done",
+            )
+        except Exception:
+            # Hier nach Wunsch loggen; Response soll trotzdem rausgehen
+            pass
+
         return result
+
 
     @app.post("/api/v1/check")
     def api_v1_check_post(
@@ -403,15 +406,6 @@ def register_routes(
     ) -> Dict[str, Any]:
         """
         POST-Variante des synchronen Prelaunch-Checks.
-
-        Request (JSON-Body):
-            {
-                "URL": "https://example.com",
-                "max_pages": 20
-            }
-
-        Authentifizierung:
-            Header: x-api-key: <DEIN_API_KEY>
         """
         try:
             result = run_checks(
@@ -420,5 +414,17 @@ def register_routes(
             )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+        check_id = str(uuid.uuid4())
+        try:
+            save_check_to_db(
+                check_id=check_id,
+                start_url=str(payload.url),
+                customer_id=payload.customer_id,
+                result=result,
+                status="done",
+            )
+        except Exception:
+            pass
 
         return result

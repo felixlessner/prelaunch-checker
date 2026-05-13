@@ -10,9 +10,15 @@ from bs4 import BeautifulSoup
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+from typing import Optional
+from db import init_db, save_check_to_db
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
@@ -377,25 +383,48 @@ def crawl(start_url: str, max_pages: int, job_id: str):
                 "sources": sources,
             })
 
-    with lock:
-        jobs[job_id]["status"] = "done"
-        jobs[job_id]["progress"] = 100
-        jobs[job_id]["result"] = {
-            "site_summary": site_summary,
-            "pages": results,
-            "broken_links": broken_links,
-            "crawled_count": len(results),
-        }
+        with lock:
+            jobs[job_id]["status"] = "done"
+            jobs[job_id]["progress"] = 100
+            jobs[job_id]["result"] = {
+                "site_summary": site_summary,
+                "pages": results,
+                "broken_links": broken_links,
+                "crawled_count": len(results),
+            }
+        # Kopie der Job-Daten für DB-Speicherung
+        job_data = jobs[job_id].copy()
+
+    # Außerhalb des Locks in die DB schreiben
+    try:
+        save_check_to_db(
+            check_id=job_id,
+            start_url=job_data.get("start_url"),
+            customer_id=job_data.get("customer_id"),
+            result=job_data["result"],
+            status=job_data.get("status", "done"),
+        )
+    except Exception:
+        # Hier könntest du noch Logging ergänzen
+        # z.B. logging.exception("Konnte Check nicht in DB speichern")
+        pass
 
 class StartRequest(BaseModel):
     url: str
     max_pages: int = 20
+    customer_id: Optional[str] = None
 
 @app.post("/api/start")
 def start_check(req: StartRequest, bg: BackgroundTasks):
     job_id = str(uuid.uuid4())
     with lock:
-        jobs[job_id] = {"status": "queued", "progress": 0, "result": None}
+        jobs[job_id] = {
+            "status": "queued",
+            "progress": 0,
+            "result": None,
+            "customer_id": req.customer_id,
+            "start_url": req.url,
+        }
     bg.add_task(crawl, req.url, req.max_pages, job_id)
     return {"job_id": job_id}
 
@@ -433,4 +462,3 @@ register_routes(
     check_favicon=check_favicon,
     check_apple_touch_icon=check_apple_touch_icon,
 )
-
