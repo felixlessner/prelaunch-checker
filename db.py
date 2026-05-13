@@ -13,13 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://datenbank_blai_user:6wkBpt0VzTMNwdtjBBG074uoxQ2SraWh@dpg-d823bqkvikkc73eaoim0-a.frankfurt-postgres.render.com/datenbank_blai",
-)
-
-
-print("Using DATABASE_URL:", DATABASE_URL)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(
     DATABASE_URL,
