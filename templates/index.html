@@ -121,15 +121,32 @@ async function startCheck(){
   pollTimer=setInterval(poll,1800);
 }
 
-async function poll(){
-  const res=await fetch('/api/status/'+jobId);
-  const data=await res.json();
-  const labels={queued:'In Warteschlange...',crawling:'Crawle Seiten...',checking:'Analysiere Seiten...',done:'Fertig!'};
-  setProgress(data.progress||0,labels[data.status]||data.status);
-  if(data.status==='done'){
+async function poll() {
+  const res = await fetch('/api/status/' + jobId);
+
+  if (!res.ok) {
     clearInterval(pollTimer);
-    $('progressSection').style.display='none';
-    globalData=data.result;
+    pollTimer = null;
+    setProgress(100, 'Fehler: Job nicht gefunden');
+    alert('Der Check konnte nicht gefunden werden. Bitte neu starten.');
+    return;
+  }
+
+  const data = await res.json();
+  const labels = {
+    queued: 'In Warteschlange...',
+    crawling: 'Crawle Seiten...',
+    checking: 'Analysiere Seiten...',
+    done: 'Fertig!'
+  };
+
+  setProgress(data.progress || 0, labels[data.status] || data.status);
+
+  if (data.status === 'done') {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    $('progressSection').style.display = 'none';
+    globalData = data.result;
     renderResults(data.result);
   }
 }
