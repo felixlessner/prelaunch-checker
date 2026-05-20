@@ -45,6 +45,28 @@ def make_session():
     s.headers["User-Agent"] = "Mozilla/5.0 (compatible; PreLaunchChecker/1.0)"
     return s
 
+def normalize_start_url(u: str) -> str:
+    u = u.strip()
+    parsed = urlparse(u)
+
+    # Wenn User explizit http/https angibt: so lassen
+    if parsed.scheme in ("http", "https"):
+        return u
+
+    if not parsed.scheme:
+        # Erst https probieren, bei Fehler auf http zurückfallen
+        https_url = "https://" + u
+        try:
+            r = rq.head(https_url, timeout=4, allow_redirects=True)
+            if r.status_code < 400:
+                return https_url
+        except Exception:
+            pass
+        return "http://" + u
+
+    # Andere Schemes (ftp, mailto, …) kannst du ggf. ablehnen
+    raise ValueError("Nur http und https werden unterstützt.")
+
 def safe_get(session, url, timeout=12):
     try:
         return session.get(url, timeout=timeout, allow_redirects=True), None
@@ -385,15 +407,15 @@ def crawl(start_url: str, max_pages: int, job_id: str):
                 "sources": sources,
             })
 
-        with lock:
-            jobs[job_id]["status"] = "done"
-            jobs[job_id]["progress"] = 100
-            jobs[job_id]["result"] = {
-                "site_summary": site_summary,
-                "pages": results,
-                "broken_links": broken_links,
-                "crawled_count": len(results),
-            }
+    with lock:
+        jobs[job_id]["status"] = "done"
+        jobs[job_id]["progress"] = 100
+        jobs[job_id]["result"] = {
+            "site_summary": site_summary,
+            "pages": results,
+            "broken_links": broken_links,
+            "crawled_count": len(results),
+        }
         # Kopie der Job-Daten für DB-Speicherung
         job_data = jobs[job_id].copy()
 
@@ -418,6 +440,9 @@ class StartRequest(BaseModel):
 
 @app.post("/api/start")
 def start_check(req: StartRequest, bg: BackgroundTasks):
+    # NEU: URL normalisieren
+    start_url = normalize_start_url(req.url)
+
     job_id = str(uuid.uuid4())
     with lock:
         jobs[job_id] = {
@@ -425,9 +450,10 @@ def start_check(req: StartRequest, bg: BackgroundTasks):
             "progress": 0,
             "result": None,
             "customer_id": req.customer_id,
-            "start_url": req.url,
+            "start_url": start_url,
         }
-    bg.add_task(crawl, req.url, req.max_pages, job_id)
+    # NEU: normalisierte URL an crawl übergeben
+    bg.add_task(crawl, start_url, req.max_pages, job_id)
     return {"job_id": job_id}
 
 @app.get("/api/status/{job_id}")
