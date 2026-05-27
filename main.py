@@ -474,7 +474,10 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open("templates/index.html", encoding="utf-8") as f:
-        return f.read()
+        html = f.read()
+    webhook_url = os.getenv("N8N_WEBHOOK_URL", "")
+    html = html.replace("__WEBHOOK_URL__", webhook_url)
+    return html
 
 # Ganz unten in main.py hinzufügen:
 
