@@ -343,6 +343,17 @@
         >
           &#11015; Export / Download
         </button>
+        <button
+            id="optimizeButton"
+            type="button"
+            onclick="sendOptimizationWebhook()"
+            style="display:none;padding:8px 16px;border-radius:999px;
+                   border:none;background:linear-gradient(90deg,#22c55e,#16a34a);
+                   color:#f9fafb;font-weight:600;font-size:13px;
+                   box-shadow:0 12px 25px rgba(22,163,74,0.45);"
+        >
+            🚀 Jetzt optimieren lassen
+        </button>
       </div>
 
       <div id="panel-overview" class="fade-in"></div>
@@ -359,6 +370,122 @@
     const $ = id => document.getElementById(id);
     const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const icon = ok => ok ? '<span class="ok">&#10004;</span>' : '<span class="err">&#10008;</span>';
+
+    const WEBHOOK_URL = '__WEBHOOK_URL__';
+
+async function sendOptimizationWebhook() {
+  if (!globalData) {
+    alert('Es liegen noch keine Analyse-Daten vor.');
+    return;
+  }
+
+  // Button deaktivieren & Ladeindikator zeigen
+  const btn = $('optimizeButton');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ KI optimiert...';
+  }
+
+  const pages = globalData.pages || [];
+  const payload = {
+    crawled_page_count: pages.length,
+    crawled_count: globalData.crawled_count || pages.length,
+    pages: pages.map(p => {
+      const checks = p.checks || {};
+      const title = checks.title || {};
+      const h1 = checks.h1 || {};
+      const meta = checks.meta_description || {};
+      const links = checks.links || {};
+      return {
+        url: p.url || '',
+        links: links.links || [],
+        h1: h1.texts || [],
+        title: title.text || '',
+        meta_description: meta.text || ''
+      };
+    })
+  };
+
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(300000) // 5 Minuten Timeout
+    });
+
+    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+
+    const result = await res.json();
+
+// n8n gibt ein Array zurück → erstes Element nehmen
+const data = Array.isArray(result) ? result[0] : result;
+
+if (data.success && data.optimized_pages) {
+  renderOptimizedResults(data.optimized_pages);
+} else {
+  alert('Unerwartetes Antwortformat vom Webhook.');
+}
+
+  } catch (err) {
+    console.error('Webhook-Fehler:', err);
+    alert('Beim Senden an den Webhook ist ein Fehler aufgetreten: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🚀 Jetzt optimieren lassen';
+    }
+  }
+}
+
+function renderOptimizedResults(optimizedPages) {
+  // Tab hinzufügen falls noch nicht vorhanden
+  const tabBar = document.querySelector('.tab-bar'); // ggf. anpassen
+  
+  const rows = optimizedPages.map(p => `
+    <tr>
+      <td style="max-width:200px;word-break:break-all;font-size:12px;">
+        <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;">${esc(p.url)}</a>
+      </td>
+      <td style="font-size:12px;">${esc(p.optimized_title || '')}</td>
+      <td style="font-size:12px;">${esc(p.optimized_meta_description || '')}</td>
+      <td style="font-size:12px;">${esc(p.optimized_h1 || '')}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <div class="card fade-in" style="margin-top:24px;overflow-x:auto;">
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,0.2);">
+        <span style="font-weight:700;font-size:15px;">✨ KI-optimierte SEO-Merkmale</span>
+        <span style="color:#64748b;font-size:12px;margin-left:12px;">${optimizedPages.length} Seite/n optimiert</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>URL</th>
+          <th>Optimierter Title</th>
+          <th>Optimierte Meta Description</th>
+          <th>Optimierte H1</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // Ergebnis unterhalb der bestehenden Ergebnisse einfügen
+  const resultsSection = $('resultsSection');
+  
+  // Altes Optimierungs-Panel entfernen falls vorhanden
+  const existing = $('optimized-panel');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.id = 'optimized-panel';
+  div.innerHTML = html;
+  resultsSection.appendChild(div);
+
+  // Runterscrollen
+  div.scrollIntoView({ behavior: 'smooth' });
+}
 
     async function startCheck() {
       const url = $('urlInput').value.trim();
@@ -484,7 +611,9 @@
     function renderResults(data) {
       $('resultsSection').style.display = 'block';
       renderCards(data); renderOverview(data); renderPages(data);
-      renderBroken(data); renderAdobe(data); renderTechnical(data); renderRobots(data);
+      renderBroken(data); renderAdobe(data); renderTechnical(data); renderRobots(data); 
+      const btn = $('optimizeButton');
+      if (btn) btn.style.display = 'inline-flex';
       showTab('overview');
     }
 
