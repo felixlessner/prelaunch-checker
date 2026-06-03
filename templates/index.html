@@ -335,33 +335,27 @@
           <button class="tab inactive" onclick="showTab('technical')" id="tab-technical">Technik</button>
           <button class="tab inactive" onclick="showTab('robots')" id="tab-robots">robots.txt</button>
         </div>
+        </div>
+
+       <div style="display:flex;justify-content:flex-end;">
         <button
           onclick="exportCurrentTab()"
           style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.95);border:1px solid rgba(148,163,184,0.5);color:#cbd5e1;padding:7px 18px;border-radius:999px;font-size:13px;font-weight:500;transition:.2s;white-space:nowrap;"
           onmouseover="this.style.background='rgba(37,99,235,0.25)';this.style.borderColor='rgba(59,130,246,0.7)';this.style.color='#e5f2ff';"
           onmouseout="this.style.background='rgba(15,23,42,0.95)';this.style.borderColor='rgba(148,163,184,0.5)';this.style.color='#cbd5e1';"
         >
-          &#11015; Export / Download
-        </button>
-        <button
-            id="optimizeButton"
-            type="button"
-            onclick="sendOptimizationWebhook()"
-            style="display:none;padding:8px 16px;border-radius:999px;
-                   border:none;background:linear-gradient(90deg,#22c55e,#16a34a);
-                   color:#f9fafb;font-weight:600;font-size:13px;
-                   box-shadow:0 12px 25px rgba(22,163,74,0.45);"
-        >
-            🚀 Jetzt optimieren lassen
+          ⬇ Export / Download
         </button>
       </div>
 
+      <div id="resultsSection" style="margin-top:16px;">
       <div id="panel-overview" class="fade-in"></div>
       <div id="panel-pages" style="display:none;" class="fade-in"></div>
       <div id="panel-broken" style="display:none;" class="fade-in"></div>
       <div id="panel-adobe" style="display:none;" class="fade-in"></div>
       <div id="panel-technical" style="display:none;" class="fade-in"></div>
       <div id="panel-robots" style="display:none;" class="fade-in"></div>
+      </div>
     </section>
   </main>
 
@@ -370,6 +364,23 @@
     const $ = id => document.getElementById(id);
     const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const icon = ok => ok ? '<span class="ok">&#10004;</span>' : '<span class="err">&#10008;</span>';
+    function onLocationChange() {
+  const input = $('locationInput');
+  const btn = $('optimizeButton');
+  if (!input || !btn) return;
+
+  const hasValue = input.value.trim().length > 0;
+  btn.disabled = !hasValue;
+
+  // optional: Optik anpassen
+  if (hasValue) {
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+  }
+}
 
     const WEBHOOK_URL = '__WEBHOOK_URL__';
 
@@ -378,6 +389,15 @@ async function sendOptimizationWebhook() {
     alert('Es liegen noch keine Analyse-Daten vor.');
     return;
   }
+
+  const locationInput = $('locationInput');
+  const location = locationInput ? locationInput.value.trim() : '';
+
+  if (!location) {
+    alert('Bitte einen Standort eingeben.');
+    return;
+  }
+
 
   // Button deaktivieren & Ladeindikator zeigen
   const btn = $('optimizeButton');
@@ -390,6 +410,7 @@ async function sendOptimizationWebhook() {
   const payload = {
     crawled_page_count: pages.length,
     crawled_count: globalData.crawled_count || pages.length,
+    location: location,
     pages: pages.map(p => {
       const checks = p.checks || {};
       const title = checks.title || {};
@@ -433,7 +454,7 @@ if (data.success && data.optimized_pages) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '🚀 Jetzt optimieren lassen';
+      btn.textContent = 'Optimieren lassen';
     }
   }
 }
@@ -490,11 +511,35 @@ function renderOptimizedResults(optimizedPages) {
     async function startCheck() {
       const url = $('urlInput').value.trim();
       const maxPages = parseInt($('maxPages').value) || 20;
-      if (!url) { alert('Bitte eine URL eingeben.'); return; }
+      if (!url) {
+        alert('Bitte eine URL eingeben.');
+        return;
+      }
+
+      const oldOpt = $('optimized-panel');
+      if (oldOpt) oldOpt.remove();
+
+      globalData = null;
+
+      const locInput = $('locationInput');
+      if (locInput) locInput.value = '';
+
+      const optBtn = $('optimizeButton');
+      if (optBtn) {
+        optBtn.disabled = true;
+        optBtn.style.opacity = '0.6';
+        optBtn.style.cursor = 'not-allowed';
+      }
+
       $('progressSection').style.display = 'block';
       $('resultsSection').style.display = 'none';
       setProgress(0, 'Starte Crawler...');
-      const res = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, max_pages: maxPages }) });
+
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, max_pages: maxPages })
+      });
       const data = await res.json();
       jobId = data.job_id;
       pollTimer = setInterval(poll, 1800);
@@ -609,51 +654,156 @@ function renderOptimizedResults(optimizedPages) {
     }
 
     function renderResults(data) {
+      const oldOpt = $('optimized-panel');
+      if (oldOpt) oldOpt.remove();
+
       $('resultsSection').style.display = 'block';
-      renderCards(data); renderOverview(data); renderPages(data);
-      renderBroken(data); renderAdobe(data); renderTechnical(data); renderRobots(data); 
+      renderCards(data);
+      renderOverview(data);
+      renderPages(data);
+      renderBroken(data);
+      renderAdobe(data);
+      renderTechnical(data);
+      renderRobots(data);
+
       const btn = $('optimizeButton');
       if (btn) btn.style.display = 'inline-flex';
+
       showTab('overview');
     }
 
-    function renderCards(data) {
-      const pages = data.pages || [];
-      const colorMap = { ok: '#22c55e', err: '#ef4444', warn: '#f59e0b', info: '#60a5fa' };
-      const noTitle = pages.filter(p => p.checks && p.checks.title && p.checks.title.missing).length;
-      const noDesc = pages.filter(p => p.checks && p.checks.meta_description && p.checks.meta_description.missing).length;
-      const noH1 = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.missing).length;
-      const multiH1 = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.multiple).length;
-      const noIndex = pages.filter(p => p.checks && p.checks.indexability && p.checks.indexability.noindex).length;
-      const broken = (data.broken_links || []).length;
-      let adobeTotal = 0;
-      pages.forEach(p => { if (p.checks && p.checks.adobe_stock) adobeTotal += p.checks.adobe_stock.count || 0; });
-      const first = pages[0];
-      const favStatus = first && first.checks && first.checks.favicon ? first.checks.favicon.status : 'unknown';
-      const appleStatus = first && first.checks && first.checks.apple_touch_icon ? first.checks.apple_touch_icon.status : 'unknown';
-      const cards = [
-        { label: 'Gecrawlte Seiten', v: pages.length, cls: 'info' },
-        { label: 'Fehlendes Title', v: noTitle, cls: noTitle ? 'err' : 'ok' },
-        { label: 'Fehlende Meta Desc.', v: noDesc, cls: noDesc ? 'err' : 'ok' },
-        { label: 'Fehlende H1', v: noH1, cls: noH1 ? 'err' : 'ok' },
-        { label: 'Mehrere H1', v: multiH1, cls: multiH1 ? 'warn' : 'ok' },
-        { label: 'NoIndex-Seiten', v: noIndex, cls: noIndex ? 'warn' : 'ok' },
-        { label: 'Broken Links', v: broken, cls: broken ? 'err' : 'ok' },
-        { label: 'Adobe Stock Previews', v: adobeTotal, cls: adobeTotal ? 'err' : 'ok' },
-        {
-          label: 'Blindtext',
-          v: (() => { let n = 0; pages.forEach(p => { if (p.checks && p.checks.blindtext && p.checks.blindtext.found) n += p.checks.blindtext.count || 1; }); return n; })(),
-          cls: (() => { let n = 0; pages.forEach(p => { if (p.checks && p.checks.blindtext && p.checks.blindtext.found) n++; }); return n ? 'err' : 'ok'; })()
-        },
-        { label: 'Favicon', v: favStatus === 'ok' ? 'OK' : favStatus === 'warning' ? 'Hinweis' : 'Fehlt', cls: favStatus === 'ok' ? 'ok' : favStatus === 'warning' ? 'warn' : 'err' },
-        { label: 'Apple Touch Icon', v: appleStatus === 'ok' ? 'OK' : appleStatus === 'warning' ? 'Hinweis' : 'Fehlt', cls: appleStatus === 'ok' ? 'ok' : appleStatus === 'warning' ? 'warn' : 'err' },
-      ];
-      $('summaryCards').innerHTML = cards.map(c => `
+function renderCards(data) {
+  const pages = data.pages || [];
+  const colorMap = {
+    ok: '#22c55e',
+    err: '#ef4444',
+    warn: '#f59e0b',
+    info: '#60a5fa'
+  };
+
+  const noTitle = pages.filter(p => p.checks && p.checks.title && p.checks.title.missing).length;
+  const noDesc  = pages.filter(p => p.checks && p.checks.meta_description && p.checks.meta_description.missing).length;
+  const noH1    = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.missing).length;
+  const multiH1 = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.multiple).length;
+  const noIndex = pages.filter(p => p.checks && p.checks.indexability && p.checks.indexability.noindex).length;
+  const broken  = (data.broken_links || []).length;
+
+  let adobeTotal = 0;
+  pages.forEach(p => {
+    if (p.checks && p.checks.adobe_stock)
+      adobeTotal += p.checks.adobe_stock.count || 0;
+  });
+
+  const first = pages[0];
+  const favStatus   = first && first.checks && first.checks.favicon
+    ? first.checks.favicon.status
+    : 'unknown';
+  const appleStatus = first && first.checks && first.checks.apple_touch_icon
+    ? first.checks.apple_touch_icon.status
+    : 'unknown';
+
+  const cards = [
+    { label: 'Gecrawlte Seiten',    v: pages.length,            cls: 'info' },
+    { label: 'Fehlender Title',     v: noTitle,                 cls: noTitle ? 'err' : 'ok' },
+    { label: 'Fehlende Meta Desc.', v: noDesc,                  cls: noDesc ? 'err' : 'ok' },
+    { label: 'Fehlende H1',         v: noH1,                    cls: noH1 ? 'err' : 'ok' },
+    { label: 'Mehrere H1',          v: multiH1,                 cls: multiH1 ? 'warn' : 'ok' },
+    { label: 'NoIndex-Seiten',      v: noIndex,                 cls: noIndex ? 'warn' : 'ok' },
+    { label: 'Broken Links',        v: broken,                  cls: broken ? 'err' : 'ok' },
+    { label: 'Adobe Stock Previews', v: adobeTotal,             cls: adobeTotal ? 'err' : 'ok' },
+    {
+      label: 'Blindtext',
+      v: (() => {
+        let n = 0;
+        pages.forEach(p => {
+          if (p.checks && p.checks.blindtext && p.checks.blindtext.found)
+            n += p.checks.blindtext.count || 1;
+        });
+        return n;
+      })(),
+      cls: (() => {
+        let n = 0;
+        pages.forEach(p => {
+          if (p.checks && p.checks.blindtext && p.checks.blindtext.found)
+            n++;
+        });
+        return n ? 'err' : 'ok';
+      })()
+    },
+    {
+      label: 'Favicon',
+      v: favStatus === 'ok' ? 'OK' : favStatus === 'warning' ? 'Hinweis' : 'Fehlt',
+      cls: favStatus === 'ok' ? 'ok' : favStatus === 'warning' ? 'warn' : 'err'
+    },
+    {
+      label: 'Apple Touch Icon',
+      v: appleStatus === 'ok' ? 'OK' : appleStatus === 'warning' ? 'Hinweis' : 'Fehlt',
+      cls: appleStatus === 'ok' ? 'ok' : appleStatus === 'warning' ? 'warn' : 'err'
+    },
+  ];
+
+  // Bisherige Kennzahlen-Cards
+  const summaryHtml = cards.map(c => `
     <div class="card" style="padding:18px 20px;">
-      <div style="font-size:26px;font-weight:800;color:${colorMap[c.cls]};">${c.v}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px;">${c.label}</div>
-    </div>`).join('');
-    }
+      <div style="font-size:26px;font-weight:800;color:${colorMap[c.cls]};">
+        ${c.v}
+      </div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px;">
+        ${c.label}
+      </div>
+    </div>
+  `).join('');
+
+  // NEU: Standort-Card als letzte Card
+  const locationCard = `
+    <div class="card" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
+
+      <input
+        id="locationInput"
+        type="text"
+        placeholder="Standort"
+        oninput="onLocationChange()"
+        style="
+          background:rgba(15,23,42,0.9);
+          border:1px solid rgba(148,163,184,0.6);
+          color:#e2e8f0;
+          border-radius:8px;
+          padding:8px 10px;
+          font-size:14px;
+          width:100%;
+          outline:none;
+        "
+      />
+
+      <button
+        id="optimizeButton"
+        type="button"
+        onclick="sendOptimizationWebhook()"
+        disabled
+        style="
+          padding:10px 14px;
+          border-radius:999px;
+          border:none;
+          background:linear-gradient(90deg,#22c55e,#16a34a);
+          color:#fff;
+          font-weight:600;
+          font-size:12px;
+          opacity:0.6;
+          cursor:not-allowed;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:6px;
+        "
+      >
+        <span>Optimieren lassen</span>
+      </button>
+    </div>
+  `;
+
+  // Kennzahlen + Standort-Card zusammen in den Summary-Container rendern
+  $('summaryCards').innerHTML = summaryHtml + locationCard;
+}
 
     function renderOverview(data) {
       const pages = data.pages || [];
@@ -897,7 +1047,7 @@ rel="icon" href="/img/favicon.png" sizes="any"&gt;</code>
       </div>
       ${robots.disallows_all ? '<span class="badge b-err" style="margin-left:auto;">Disallow: / gesetzt!</span>' : ''}
     </div>
-    ${robots.found ? `<pre style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;font-size:12px;overflow-x:auto;color:#cbd5e1;white-space:pre-wrap;">${esc(robots.content_preview || '(leer)')}</pre>` : '<p style="color:#64748b;font-size:14px;">Eine robots.txt wird fuer SEO empfohlen.</p>'}
+    ${robots.found ? `<pre style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;font-size:12px;overflow-x:auto;color:#cbd5e1;white-space:pre-wrap;">${esc(robots.content_preview || '(leer)')}</pre>` : '<p style="color:#64748b;font-size:14px;">Eine robots.txt wird für SEO empfohlen.</p>'}
   </div>`;
     }
 
