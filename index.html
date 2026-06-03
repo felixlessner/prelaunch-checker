@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Website Checker | BERENDSOHN AG</title>
+  <meta name="description" content="Prüfe eine Website auf Qualität, Technik, Broken Links & mehr. Einfach URL eingeben, analysieren lassen und Fehler beheben." />
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * {
+      font-family: system-ui, sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      color: #e2e8f0;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 40px;
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding: 20px 16px 32px;
+      }
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94));
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 14px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.9);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.4s ease;
+    }
+
+    .bar-fill {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #3b82f6, #22c55e);
+      transition: width 0.4s;
+    }
+
+    details summary {
+      cursor: pointer;
+    }
+
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .ok {
+      color: #22c55e;
+    }
+
+    .warn {
+      color: #f59e0b;
+    }
+
+    .err {
+      color: #ef4444;
+    }
+
+    .info {
+      color: #60a5fa;
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .b-ok {
+      background: #14532d;
+      color: #86efac;
+    }
+
+    .b-warn {
+      background: #713f12;
+      color: #fde68a;
+    }
+
+    .b-err {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .b-info {
+      background: #1e3a8a;
+      color: #93c5fd;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #3b82f6;
+      border-radius: 3px;
+    }
+
+    input[type=url],
+    input[type=number] {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      outline: none;
+      font-size: 15px;
+      width: 100%;
+    }
+
+    input::placeholder {
+      color: #64748b;
+    }
+
+    input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95));
+    }
+
+    td {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.85);
+      vertical-align: top;
+    }
+
+    tr:hover td {
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .tab {
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      transition: 0.18s ease;
+      background: rgba(15, 23, 42, 0.9);
+      color: #94a3b8;
+    }
+
+    .tab.active {
+      background: radial-gradient(circle at top left, #3b82f6, #2563eb);
+      color: #fff;
+      border-color: rgba(59, 130, 246, 0.8);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 1), 0 18px 35px rgba(15, 23, 42, 0.9);
+    }
+
+    .tab.inactive:hover {
+      background: rgba(30, 64, 175, 0.35);
+      color: #e2e8f0;
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    .check-row {
+      border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+    }
+
+    .check-row:last-child {
+      border-bottom: none;
+    }
+
+    .source-divider {
+      border: none;
+      border-top: 1px solid rgba(15, 23, 42, 0.9);
+      margin: 4px 0;
+    }
+
+    a {
+      color: #60a5fa;
+    }
+
+    a:hover {
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body onload="loadVersion()">
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div style="width:36px;height:36px;background:radial-gradient(circle at 0 0,#60a5fa,#2563eb);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 25px rgba(37, 99, 235, 0.7);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">Website Checker</div>
+          <div class="brand-sub">Website-Qualitätscheck</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1200px;margin:0 auto;padding:32px 24px;">
+  <div class="card fade-in" style="padding:32px;margin-bottom:28px;">
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;">Website prüfen und Ergebnisse einsehen</h1>
+    <p style="margin:0 0 24px;color:#E2E8F0;font-size:14px;">URL eingeben und auf alle relevanten Merkmale prüfen lassen.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="flex:1;min-width:260px;">
+        <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500;">Website-URL</label>
+        <input type="url" id="urlInput" placeholder="https://www.example.de" style="width:100%;"/>
+      </div>
+      <div style="width:130px;">
+        <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:500;">Max. Seiten</label>
+        <input type="number" id="maxPages" value="50" min="1" max="100" style="width:100%;"/>
+      </div>
+      <button onclick="startCheck()" style="background:#2563eb;color:#fff;border:none;padding:11px 28px;border-radius:8px;font-size:14px;font-weight:600;white-space:nowrap;">
+        &#9654; Analyse starten
+      </button>
+    </div>
+  </div>
+
+    <!-- Fortschritt -->
+    <section class="card fade-in mb-7 px-6 py-6" id="progressSection" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="h-7 w-7 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-blue-300 text-xs">
+            %
+          </div>
+          <span style="font-weight:600;" id="progressLabel">Starte Crawler...</span>
+        </div>
+        <span style="color:#94a3b8;font-size:14px;" id="progressPct">0%</span>
+      </div>
+      <div style="background:rgba(15,23,42,0.95);border-radius:999px;padding:2px;">
+        <div class="bar-fill" id="progressBar" style="width:0%;"></div>
+      </div>
+      <p style="margin:12px 0 0;font-size:13px;color:#64748b;">
+        Dies kann je nach Seitengröße einige Minuten dauern. Du kannst die Seite währenddessen geöffnet lassen.
+      </p>
+    </section>
+
+    <!-- Ergebnisse -->
+    <section id="resultsSection" style="display:none;">
+      <div id="summaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:24px;"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="tab active" onclick="showTab('overview')" id="tab-overview">Übersicht</button>
+          <button class="tab inactive" onclick="showTab('pages')" id="tab-pages">Seiten-Details</button>
+          <button class="tab inactive" onclick="showTab('broken')" id="tab-broken">Broken Links</button>
+          <button class="tab inactive" onclick="showTab('adobe')" id="tab-adobe">Adobe Stock</button>
+          <button class="tab inactive" onclick="showTab('technical')" id="tab-technical">Technik</button>
+          <button class="tab inactive" onclick="showTab('robots')" id="tab-robots">robots.txt</button>
+        </div>
+        </div>
+
+       <div style="display:flex;justify-content:flex-end;">
+        <button
+          onclick="exportCurrentTab()"
+          style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.95);border:1px solid rgba(148,163,184,0.5);color:#cbd5e1;padding:7px 18px;border-radius:999px;font-size:13px;font-weight:500;transition:.2s;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(37,99,235,0.25)';this.style.borderColor='rgba(59,130,246,0.7)';this.style.color='#e5f2ff';"
+          onmouseout="this.style.background='rgba(15,23,42,0.95)';this.style.borderColor='rgba(148,163,184,0.5)';this.style.color='#cbd5e1';"
+        >
+          ⬇ Export / Download
+        </button>
+      </div>
+
+      <div id="resultsSection" style="margin-top:16px;">
+      <div id="panel-overview" class="fade-in"></div>
+      <div id="panel-pages" style="display:none;" class="fade-in"></div>
+      <div id="panel-broken" style="display:none;" class="fade-in"></div>
+      <div id="panel-adobe" style="display:none;" class="fade-in"></div>
+      <div id="panel-technical" style="display:none;" class="fade-in"></div>
+      <div id="panel-robots" style="display:none;" class="fade-in"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let jobId = null, pollTimer = null, globalData = null;
+    const $ = id => document.getElementById(id);
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const icon = ok => ok ? '<span class="ok">&#10004;</span>' : '<span class="err">&#10008;</span>';
+    function onLocationChange() {
+  const input = $('locationInput');
+  const btn = $('optimizeButton');
+  if (!input || !btn) return;
+
+  const hasValue = input.value.trim().length > 0;
+  btn.disabled = !hasValue;
+
+  // optional: Optik anpassen
+  if (hasValue) {
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+  }
+}
+
+    const WEBHOOK_URL = '__WEBHOOK_URL__';
+
+async function sendOptimizationWebhook() {
+  if (!globalData) {
+    alert('Es liegen noch keine Analyse-Daten vor.');
+    return;
+  }
+
+  const locationInput = $('locationInput');
+  const location = locationInput ? locationInput.value.trim() : '';
+
+  if (!location) {
+    alert('Bitte einen Standort eingeben.');
+    return;
+  }
+
+
+  // Button deaktivieren & Ladeindikator zeigen
+  const btn = $('optimizeButton');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ KI optimiert...';
+  }
+
+  const pages = globalData.pages || [];
+  const payload = {
+    crawled_page_count: pages.length,
+    crawled_count: globalData.crawled_count || pages.length,
+    location: location,
+    pages: pages.map(p => {
+      const checks = p.checks || {};
+      const title = checks.title || {};
+      const h1 = checks.h1 || {};
+      const meta = checks.meta_description || {};
+      const links = checks.links || {};
+      return {
+        url: p.url || '',
+        links: links.links || [],
+        h1: h1.texts || [],
+        title: title.text || '',
+        meta_description: meta.text || ''
+      };
+    })
+  };
+
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(300000) // 5 Minuten Timeout
+    });
+
+    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+
+    const result = await res.json();
+
+// n8n gibt ein Array zurück → erstes Element nehmen
+const data = Array.isArray(result) ? result[0] : result;
+
+if (data.success && data.optimized_pages) {
+  renderOptimizedResults(data.optimized_pages);
+} else {
+  alert('Unerwartetes Antwortformat vom Webhook.');
+}
+
+  } catch (err) {
+    console.error('Webhook-Fehler:', err);
+    alert('Beim Senden an den Webhook ist ein Fehler aufgetreten: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Optimieren lassen';
+    }
+  }
+}
+
+function renderOptimizedResults(optimizedPages) {
+  // Tab hinzufügen falls noch nicht vorhanden
+  const tabBar = document.querySelector('.tab-bar'); // ggf. anpassen
+  
+  const rows = optimizedPages.map(p => `
+    <tr>
+      <td style="max-width:200px;word-break:break-all;font-size:12px;">
+        <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;">${esc(p.url)}</a>
+      </td>
+      <td style="font-size:12px;">${esc(p.optimized_title || '')}</td>
+      <td style="font-size:12px;">${esc(p.optimized_meta_description || '')}</td>
+      <td style="font-size:12px;">${esc(p.optimized_h1 || '')}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <div class="card fade-in" style="margin-top:24px;overflow-x:auto;">
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,0.2);">
+        <span style="font-weight:700;font-size:15px;">✨ KI-optimierte SEO-Merkmale</span>
+        <span style="color:#64748b;font-size:12px;margin-left:12px;">${optimizedPages.length} Seite/n optimiert</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>URL</th>
+          <th>Optimierter Title</th>
+          <th>Optimierte Meta Description</th>
+          <th>Optimierte H1</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // Ergebnis unterhalb der bestehenden Ergebnisse einfügen
+  const resultsSection = $('resultsSection');
+  
+  // Altes Optimierungs-Panel entfernen falls vorhanden
+  const existing = $('optimized-panel');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.id = 'optimized-panel';
+  div.innerHTML = html;
+  resultsSection.appendChild(div);
+
+  // Runterscrollen
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
+    async function startCheck() {
+      const url = $('urlInput').value.trim();
+      const maxPages = parseInt($('maxPages').value) || 20;
+      if (!url) {
+        alert('Bitte eine URL eingeben.');
+        return;
+      }
+
+      const oldOpt = $('optimized-panel');
+      if (oldOpt) oldOpt.remove();
+
+      globalData = null;
+
+      const locInput = $('locationInput');
+      if (locInput) locInput.value = '';
+
+      const optBtn = $('optimizeButton');
+      if (optBtn) {
+        optBtn.disabled = true;
+        optBtn.style.opacity = '0.6';
+        optBtn.style.cursor = 'not-allowed';
+      }
+
+      $('progressSection').style.display = 'block';
+      $('resultsSection').style.display = 'none';
+      setProgress(0, 'Starte Crawler...');
+
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, max_pages: maxPages })
+      });
+      const data = await res.json();
+      jobId = data.job_id;
+      pollTimer = setInterval(poll, 1800);
+    }
+
+    async function poll() {
+      const res = await fetch('/api/status/' + jobId);
+
+      if (!res.ok) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        setProgress(100, 'Fehler: Job nicht gefunden');
+        alert('Der Check konnte nicht gefunden werden. Bitte neu starten.');
+        return;
+      }
+
+      const data = await res.json();
+      const labels = {
+        queued: 'In Warteschlange...',
+        crawling: 'Crawle Seiten...',
+        checking: 'Analysiere Seiten...',
+        done: 'Fertig!'
+      };
+
+      setProgress(data.progress || 0, labels[data.status] || data.status);
+
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        $('progressSection').style.display = 'none';
+        globalData = data.result;
+        renderResults(data.result);
+      }
+    }
+
+    function setProgress(pct, label) {
+      $('progressBar').style.width = pct + '%';
+      $('progressPct').textContent = pct + '%';
+      $('progressLabel').textContent = label;
+    }
+
+    let currentTab = 'overview';
+    function showTab(tab) {
+      currentTab = tab;
+      ['overview', 'pages', 'broken', 'adobe', 'technical', 'robots'].forEach(t => {
+        $('panel-' + t).style.display = t === tab ? 'block' : 'none';
+        $('tab-' + t).className = 'tab ' + (t === tab ? 'active' : 'inactive');
+      });
+    }
+
+    function downloadCSV(filename, rows) {
+      const BOM = '\uFEFF';
+      const csv = BOM + rows.map(r => r.map(c => {
+        const s = String(c == null ? '' : c).replace(/\"/g, '\"\"');
+        return /[\",\n\r]/.test(s) ? '"' + s + '"' : s;
+      }).join(',')).join('\r\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); a.download = filename; a.click();
+    }
+    function downloadTXT(filename, text) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8;' })); a.download = filename; a.click();
+    }
+    function exportCurrentTab() {
+      if (!globalData) return;
+      const pages = globalData.pages || [];
+      const ts = new Date().toISOString().slice(0, 10);
+      if (currentTab === 'overview') {
+        const rows = [['URL', 'HTTP-Status', 'Indexierbar', 'Title-Status', 'Title-Text', 'Meta-Desc-Status', 'Meta-Desc-Text', 'H1', 'Adobe Stock', 'Blindtext', 'Favicon', 'Apple Icon']];
+        pages.forEach(p => {
+          const c = p.checks || {}, idx = c.indexability || {}, t = c.title || {}, d = c.meta_description || {}, h = c.h1 || {}, a = c.adobe_stock || {}, bt = c.blindtext || {}, fav = c.favicon, apple = c.apple_touch_icon;
+          rows.push([p.url, p.status_code || 'ERR', idx.noindex ? 'Nein' : 'Ja', t.missing ? 'FEHLT' : t.too_long ? 'Zu lang' : t.too_short ? 'Zu kurz' : 'OK', t.text || '', d.missing ? 'FEHLT' : d.too_long ? 'Zu lang' : d.too_short ? 'Zu kurz' : 'OK', d.text || '', h.missing ? 'FEHLT' : h.multiple ? h.count + 'x H1' : 'OK', a.found ? a.count + ' Treffer' : 'OK', bt.found ? bt.count + ' Treffer' : 'OK', fav ? fav.status : '-', apple ? apple.status : '-']);
+        });
+        downloadCSV('uebersicht-' + ts + '.csv', rows);
+      } else if (currentTab === 'pages') {
+        const rows = [['URL', 'HTTP-Status', 'Probleme', 'Warnungen']];
+        pages.forEach(p => {
+          const c = p.checks || {}, idx = c.indexability || {}, t = c.title || {}, d = c.meta_description || {}, h = c.h1 || {}, a = c.adobe_stock || {}, bt = c.blindtext || {}, fav = c.favicon, apple = c.apple_touch_icon;
+          const iss = [];
+          if (idx.noindex) iss.push('NoIndex');
+          if (t.missing) iss.push('Kein Title'); if (t.too_long) iss.push('Title zu lang'); if (t.too_short) iss.push('Title zu kurz');
+          if (d.missing) iss.push('Keine Meta Desc.'); if (d.too_long) iss.push('Meta Desc. zu lang');
+          if (h.missing) iss.push('Kein H1'); if (h.multiple) iss.push('Mehrere H1 (' + h.count + ')');
+          if (a.found) iss.push('Adobe Stock (' + a.count + ')');
+          if (bt.found) iss.push('Blindtext (' + bt.count + ' Treffer)');
+          if (fav && fav.status === 'error') iss.push('Kein Favicon');
+          if (apple && apple.status === 'error') iss.push('Kein Apple Touch Icon');
+          const warns = [];
+          if (fav && fav.status === 'warning') warns.push(fav.note);
+          if (apple && apple.status === 'warning') warns.push(apple.note);
+          rows.push([p.url, p.status_code || 'ERR', iss.join('; ') || 'OK', warns.join('; ')]);
+        });
+        downloadCSV('seiten-details-' + ts + '.csv', rows);
+      } else if (currentTab === 'broken') {
+        const broken = globalData.broken_links || [];
+        const rows = [['Fehlerhafte URL', 'HTTP-Status', 'Gefunden auf Seite', 'Ankertext']];
+        broken.forEach(b => { (b.sources || [{}]).forEach(s => { rows.push([b.url, b.status, s.page_url || '', s.anchor_text || '']); }); });
+        downloadCSV('broken-links-' + ts + '.csv', rows);
+      } else if (currentTab === 'adobe') {
+        const rows = [['Seite', 'Bild-URL', 'Erkennungsgrund', 'Tag']];
+        pages.forEach(p => { if (p.checks && p.checks.adobe_stock && p.checks.adobe_stock.found) { (p.checks.adobe_stock.samples || []).forEach(s => { rows.push([p.url, s.img_url || '', s.reason || '', s.tag || 'img']); }); } });
+        downloadCSV('adobe-stock-' + ts + '.csv', rows);
+      } else if (currentTab === 'technical') {
+        const first = pages[0]; const fav = first && first.checks && first.checks.favicon; const apple = first && first.checks && first.checks.apple_touch_icon;
+        const rows = [['Check', 'Status', 'Datei erreichbar', 'Tag vorhanden', 'Dateiname korrekt', 'HTTP-Status', 'Pfad', 'Hinweis']];
+        if (fav) rows.push(['Favicon', fav.status, fav.found ? 'Ja' : 'Nein', fav.tag_present ? 'Ja' : 'Nein', fav.correct_name ? 'Ja' : 'Nein', fav.status_code || '', fav.href || '', fav.note || '']);
+        if (apple) rows.push(['Apple Touch Icon', apple.status, apple.found ? 'Ja' : 'Nein', apple.tag_present ? 'Ja' : 'Nein', apple.correct_name ? 'Ja' : 'Nein', apple.status_code || '', apple.href || '', apple.note || '']);
+        downloadCSV('technik-' + ts + '.csv', rows);
+      } else if (currentTab === 'robots') {
+        const robots = globalData.site_summary && globalData.site_summary.robots_txt || {};
+        const text = 'URL: ' + (robots.url || '') + '\nGefunden: ' + (robots.found ? 'Ja' : 'Nein') + '\nDisallow all: ' + (robots.disallows_all ? 'Ja' : 'Nein') + '\n\n' + (robots.content_preview || '(kein Inhalt)');
+        downloadTXT('robots-txt-' + ts + '.txt', text);
+      }
+    }
+
+    function renderResults(data) {
+      const oldOpt = $('optimized-panel');
+      if (oldOpt) oldOpt.remove();
+
+      $('resultsSection').style.display = 'block';
+      renderCards(data);
+      renderOverview(data);
+      renderPages(data);
+      renderBroken(data);
+      renderAdobe(data);
+      renderTechnical(data);
+      renderRobots(data);
+
+      const btn = $('optimizeButton');
+      if (btn) btn.style.display = 'inline-flex';
+
+      showTab('overview');
+    }
+
+function renderCards(data) {
+  const pages = data.pages || [];
+  const colorMap = {
+    ok: '#22c55e',
+    err: '#ef4444',
+    warn: '#f59e0b',
+    info: '#60a5fa'
+  };
+
+  const noTitle = pages.filter(p => p.checks && p.checks.title && p.checks.title.missing).length;
+  const noDesc  = pages.filter(p => p.checks && p.checks.meta_description && p.checks.meta_description.missing).length;
+  const noH1    = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.missing).length;
+  const multiH1 = pages.filter(p => p.checks && p.checks.h1 && p.checks.h1.multiple).length;
+  const noIndex = pages.filter(p => p.checks && p.checks.indexability && p.checks.indexability.noindex).length;
+  const broken  = (data.broken_links || []).length;
+
+  let adobeTotal = 0;
+  pages.forEach(p => {
+    if (p.checks && p.checks.adobe_stock)
+      adobeTotal += p.checks.adobe_stock.count || 0;
+  });
+
+  const first = pages[0];
+  const favStatus   = first && first.checks && first.checks.favicon
+    ? first.checks.favicon.status
+    : 'unknown';
+  const appleStatus = first && first.checks && first.checks.apple_touch_icon
+    ? first.checks.apple_touch_icon.status
+    : 'unknown';
+
+  const cards = [
+    { label: 'Gecrawlte Seiten',    v: pages.length,            cls: 'info' },
+    { label: 'Fehlender Title',     v: noTitle,                 cls: noTitle ? 'err' : 'ok' },
+    { label: 'Fehlende Meta Desc.', v: noDesc,                  cls: noDesc ? 'err' : 'ok' },
+    { label: 'Fehlende H1',         v: noH1,                    cls: noH1 ? 'err' : 'ok' },
+    { label: 'Mehrere H1',          v: multiH1,                 cls: multiH1 ? 'warn' : 'ok' },
+    { label: 'NoIndex-Seiten',      v: noIndex,                 cls: noIndex ? 'warn' : 'ok' },
+    { label: 'Broken Links',        v: broken,                  cls: broken ? 'err' : 'ok' },
+    { label: 'Adobe Stock Previews', v: adobeTotal,             cls: adobeTotal ? 'err' : 'ok' },
+    {
+      label: 'Blindtext',
+      v: (() => {
+        let n = 0;
+        pages.forEach(p => {
+          if (p.checks && p.checks.blindtext && p.checks.blindtext.found)
+            n += p.checks.blindtext.count || 1;
+        });
+        return n;
+      })(),
+      cls: (() => {
+        let n = 0;
+        pages.forEach(p => {
+          if (p.checks && p.checks.blindtext && p.checks.blindtext.found)
+            n++;
+        });
+        return n ? 'err' : 'ok';
+      })()
+    },
+    {
+      label: 'Favicon',
+      v: favStatus === 'ok' ? 'OK' : favStatus === 'warning' ? 'Hinweis' : 'Fehlt',
+      cls: favStatus === 'ok' ? 'ok' : favStatus === 'warning' ? 'warn' : 'err'
+    },
+    {
+      label: 'Apple Touch Icon',
+      v: appleStatus === 'ok' ? 'OK' : appleStatus === 'warning' ? 'Hinweis' : 'Fehlt',
+      cls: appleStatus === 'ok' ? 'ok' : appleStatus === 'warning' ? 'warn' : 'err'
+    },
+  ];
+
+  // Bisherige Kennzahlen-Cards
+  const summaryHtml = cards.map(c => `
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-size:26px;font-weight:800;color:${colorMap[c.cls]};">
+        ${c.v}
+      </div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px;">
+        ${c.label}
+      </div>
+    </div>
+  `).join('');
+
+  // NEU: Standort-Card als letzte Card
+  const locationCard = `
+    <div class="card" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
+
+      <input
+        id="locationInput"
+        type="text"
+        placeholder="Standort"
+        oninput="onLocationChange()"
+        style="
+          background:rgba(15,23,42,0.9);
+          border:1px solid rgba(148,163,184,0.6);
+          color:#e2e8f0;
+          border-radius:8px;
+          padding:8px 10px;
+          font-size:14px;
+          width:100%;
+          outline:none;
+        "
+      />
+
+      <button
+        id="optimizeButton"
+        type="button"
+        onclick="sendOptimizationWebhook()"
+        disabled
+        style="
+          padding:10px 14px;
+          border-radius:999px;
+          border:none;
+          background:linear-gradient(90deg,#22c55e,#16a34a);
+          color:#fff;
+          font-weight:600;
+          font-size:12px;
+          opacity:0.6;
+          cursor:not-allowed;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:6px;
+        "
+      >
+        <span>Optimieren lassen</span>
+      </button>
+    </div>
+  `;
+
+  // Kennzahlen + Standort-Card zusammen in den Summary-Container rendern
+  $('summaryCards').innerHTML = summaryHtml + locationCard;
+}
+
+    function renderOverview(data) {
+      const pages = data.pages || [];
+      if (!pages.length) { $('panel-overview').innerHTML = '<p style="color:#64748b;">Keine Seiten gecrawlt.</p>'; return; }
+      const rows = pages.map(p => {
+        const c = p.checks || {}, idx = c.indexability || {}, title = c.title || {}, desc = c.meta_description || {}, h1 = c.h1 || {}, adobe = c.adobe_stock || {};
+        const sc = (p.status_code >= 400 || !p.status_code) ? '#ef4444' : p.status_code >= 300 ? '#f59e0b' : '#22c55e';
+        const fav = c.favicon;
+        const apple = c.apple_touch_icon;
+        const favCell = fav ? (fav.status === 'ok' ? icon(true) : fav.status === 'warning' ? '<span class="warn" title="' + esc(fav.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
+        const appleCell = apple ? (apple.status === 'ok' ? icon(true) : apple.status === 'warning' ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
+        return `<tr>
+      <td style="max-width:240px;word-break:break-all;"><a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a></td>
+      <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
+      <td>${icon(!idx.noindex)}</td>
+      <td>${icon(!title.missing)}${title.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${title.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
+      <td>${icon(!desc.missing)}${desc.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${desc.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
+      <td>${h1.missing ? icon(false) : h1.multiple ? '<span class="warn">&#9888; ' + h1.count + 'x</span>' : icon(true)}</td>
+      <td>${icon(!adobe.found)}${adobe.found ? ' <span class="err" style="font-size:10px;">(' + adobe.count + ')</span>' : ''}</td>
+      <td>${(() => { const bt = c.blindtext || {}; return bt.found ? '<span class="err">&#9888; ' + bt.count + 'x</span>' : icon(true); })()}</td>
+      <td>${favCell}</td><td>${appleCell}</td>
+    </tr>`;
+      }).join('');
+      $('panel-overview').innerHTML = `<div class="card" style="overflow-x:auto;"><table><thead><tr>
+    <th>URL</th><th>Status</th><th>Indexierbar</th><th>Title</th>
+    <th>Meta Desc.</th><th>H1</th><th>Adobe Stock</th><th>Blindtext</th><th>Favicon</th><th>Apple Icon</th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    function renderPages(data) {
+      $('panel-pages').innerHTML = (data.pages || []).map((p, i) => {
+        const c = p.checks || {}, idx = c.indexability || {}, title = c.title || {}, desc = c.meta_description || {},
+          h1 = c.h1 || {}, adobe = c.adobe_stock || {}, fav = c.favicon, apple = c.apple_touch_icon;
+        const issues = [];
+        if (idx.noindex) issues.push('NoIndex');
+        if (title.missing) issues.push('Kein Title');
+        if (title.too_long) issues.push('Title zu lang');
+        if (title.too_short) issues.push('Title zu kurz');
+        if (desc.missing) issues.push('Keine Meta Desc.');
+        if (desc.too_long) issues.push('Meta Desc. zu lang');
+        if (h1.missing) issues.push('Kein H1');
+        if (h1.multiple) issues.push('Mehrere H1 (' + h1.count + ')');
+        if (adobe.found) issues.push('Adobe Stock Preview (' + adobe.count + ')');
+        const bt = c.blindtext || {};
+        if (bt.found) issues.push('Blindtext (' + bt.count + ' Treffer)');
+        if (fav && fav.status === 'error') issues.push('Kein Favicon');
+        if (apple && apple.status === 'error') issues.push('Kein Apple Touch Icon');
+        const warnings = [];
+        if (fav && fav.status === 'warning') warnings.push(fav.note);
+        if (apple && apple.status === 'warning') warnings.push(apple.note);
+        return `<details class="card fade-in" style="margin-bottom:10px;padding:0;" ${i < 2 ? 'open' : ''}>
+      <summary style="padding:14px 20px;display:flex;align-items:center;gap:10px;">
+        <span>${issues.length ? '&#9888;&#65039;' : '&#9989;'}</span>
+        <span style="flex:1;font-size:13px;font-weight:500;word-break:break-all;">${esc(p.url)}</span>
+        ${issues.length ? `<span class="badge b-err">${issues.length} Problem${issues.length > 1 ? 'e' : ''}</span>` : ''}
+        ${warnings.length && !issues.length ? '<span class="badge b-warn">' + warnings.length + ' Hinweis' + (warnings.length > 1 ? 'e' : '') + '</span>' : ''}
+        ${!issues.length && !warnings.length ? '<span class="badge b-ok">OK</span>' : ''}
+      </summary>
+      <div style="padding:0 20px 20px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-top:14px;">
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Indexierbarkeit</div>
+            <div>${icon(!idx.noindex)} ${idx.noindex ? '<span class="err">noindex gesetzt</span>' : '<span class="ok">Indexierbar</span>'}</div>
+            ${idx.meta_robots && idx.meta_robots !== 'nicht gesetzt' ? `<div style="font-size:11px;color:#64748b;margin-top:4px;">meta robots: ${esc(idx.meta_robots)}</div>` : ''}
+            ${idx.canonical ? `<div style="font-size:11px;color:#64748b;margin-top:4px;">Canonical: ${esc(idx.canonical)}</div>` : ''}
+            <div style="margin-top:6px;">${icon(!idx.robots_txt_disallows)} robots.txt: ${idx.robots_txt_disallows ? '<span class="err">Seite gesperrt</span>' : '<span class="ok">Erlaubt</span>'}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Title-Tag</div>
+            ${title.missing ? '<div class="err">Kein Title-Tag vorhanden</div>' : `<div style="font-size:13px;font-weight:500;">${esc(title.text)}</div><div style="font-size:11px;color:${title.too_long || title.too_short ? '#f59e0b' : '#22c55e'};margin-top:4px;">${title.length} Zeichen ${title.too_long ? '(zu lang, max 60)' : title.too_short ? '(zu kurz, min 30)' : '(optimal)'}</div>`}
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Meta Description</div>
+            ${desc.missing ? '<div class="err">Keine Meta Description</div>' : `<div style="font-size:12px;">${esc((desc.text || '').substring(0, 140))}${(desc.text || '').length > 140 ? '...' : ''}</div><div style="font-size:11px;color:${desc.too_long || desc.too_short ? '#f59e0b' : '#22c55e'};margin-top:4px;">${desc.length} Zeichen ${desc.too_long ? '(zu lang, max 160)' : desc.too_short ? '(zu kurz, min 70)' : '(optimal)'}</div>`}
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">H1-Tags</div>
+            ${h1.missing ? '<div class="err">Kein H1-Tag gefunden</div>' : h1.multiple ? `<div class="warn">&#9888; ${h1.count} H1-Tags (sollte genau 1 sein)</div><ul style="margin:6px 0 0;padding-left:16px;font-size:11px;">${(h1.texts || []).map(t => `<li>${esc(t.substring(0, 80))}</li>`).join('')}</ul>` : `<div class="ok">&#10004; ${esc((h1.texts || [''])[0])}</div>`}
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Adobe Stock Preview</div>
+            ${adobe.found ? `<div class="err">&#10008; ${adobe.count} Preview-Bild${adobe.count > 1 ? 'er' : ''} gefunden</div><ul style="margin:6px 0 0;padding-left:16px;font-size:10px;color:#fca5a5;">${(adobe.samples || []).slice(0, 4).map(s => `<li style="word-break:break-all;margin-bottom:4px;"><span style="color:#94a3b8;">${esc(s.reason || '')}: </span>${esc((s.img_url || '').substring(0, 80))}</li>`).join('')}</ul>` : '<div class="ok">&#10004; Keine Adobe Stock Preview-Bilder</div>'}
+          </div>
+          ${fav ? `<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Favicon</div>
+            <div>${fav.status === 'ok' ? icon(true) : fav.status === 'warning' ? '<span class="warn">&#9888;</span>' : icon(false)} <span class="${fav.status === 'ok' ? 'ok' : fav.status === 'warning' ? 'warn' : 'err'}">${fav.found ? 'Vorhanden' : 'Nicht gefunden'}</span></div>
+            ${fav.href ? `<div style="font-size:10px;color:#64748b;margin-top:4px;word-break:break-all;">${esc(fav.href)}</div>` : ''}
+            ${fav.note && fav.note !== 'Favicon korrekt eingebunden.' ? `<div style="font-size:11px;color:${fav.status === 'warning' ? '#fde68a' : '#fca5a5'};margin-top:6px;">&#9432; ${esc(fav.note)}</div>` : ''}
+            <div style="font-size:10px;color:#64748b;margin-top:4px;">Tag vorhanden: <span class="${fav.tag_present ? 'ok' : 'err'}">${fav.tag_present ? 'Ja' : 'Nein'}</span></div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">Dateiname (favicon.png): <span class="${fav.correct_name ? 'ok' : 'warn'}">${fav.correct_name ? 'Ja' : 'Nein'}</span></div>
+          </div>` : ''}
+          ${apple ? `<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:8px;text-transform:uppercase;">Apple Touch Icon</div>
+            <div>${apple.status === 'ok' ? icon(true) : apple.status === 'warning' ? '<span class="warn">&#9888;</span>' : icon(false)} <span class="${apple.status === 'ok' ? 'ok' : apple.status === 'warning' ? 'warn' : 'err'}">${apple.found ? 'Vorhanden' : 'Nicht gefunden'}</span></div>
+            ${apple.href ? `<div style="font-size:10px;color:#64748b;margin-top:4px;word-break:break-all;">${esc(apple.href)}</div>` : ''}
+            ${apple.note && apple.note !== 'Apple Touch Icon korrekt eingebunden.' ? `<div style="font-size:11px;color:${apple.status === 'warning' ? '#fde68a' : '#fca5a5'};margin-top:6px;">&#9432; ${esc(apple.note)}</div>` : ''}
+            <div style="font-size:10px;color:#64748b;margin-top:4px;">Tag vorhanden: <span class="${apple.tag_present ? 'ok' : 'err'}">${apple.tag_present ? 'Ja' : 'Nein'}</span></div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">Dateiname (apple-touch-icon.png): <span class="${apple.correct_name ? 'ok' : 'warn'}">${apple.correct_name ? 'Ja' : 'Nein'}</span></div>
+          </div>` : ''}
+        </div>
+      </div>
+    </details>`;
+      }).join('');
+    }
+
+    function renderBroken(data) {
+      const broken = data.broken_links || [];
+      if (!broken.length) {
+        $('panel-broken').innerHTML = '<div class="card" style="padding:32px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">&#9989;</div><div class="ok" style="font-size:18px;font-weight:600;">Keine Broken Links!</div></div>';
+        return;
+      }
+
+      const rows = broken.map(b => {
+        const sources = b.sources || [];
+        const sourcesHtml = sources.map((s, si) => `
+      ${si > 0 ? '<hr class="source-divider"/>' : ''}
+      <div style="margin-bottom:2px;">
+        <span style="font-size:10px;color:#64748b;">Seite: </span>
+        <a href="${esc(s.page_url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:11px;word-break:break-all;">${esc(s.page_url)}</a>
+      </div>
+      <div>
+        <span style="font-size:10px;color:#64748b;">Ankertext: </span>
+        <span style="font-size:11px;color:#fde68a;font-style:italic;">&ldquo;${esc(s.anchor_text)}&rdquo;</span>
+      </div>`).join('');
+
+        return `<tr>
+      <td style="word-break:break-all;font-size:12px;max-width:260px;">
+        <a href="${esc(b.url)}" target="_blank" style="color:#fca5a5;text-decoration:none;font-weight:500;">${esc(b.url)}</a>
+      </td>
+      <td style="white-space:nowrap;">
+        <span style="color:#ef4444;font-weight:700;font-size:14px;">${esc(String(b.status))}</span>
+        ${b.detail ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">${esc(b.detail)}</div>` : ''}
+      </td>
+      <td style="min-width:280px;">${sourcesHtml || '<span style="color:#475569;font-size:11px;">Keine Quellinformation</span>'}</td>
+    </tr>`;
+      }).join('');
+
+      $('panel-broken').innerHTML = `
+    <div class="card" style="margin-bottom:16px;padding:14px 20px;background:rgba(127,29,29,0.25);border-color:rgba(239,68,68,0.3);">
+      <span style="color:#fca5a5;font-weight:600;">&#9888; ${broken.length} fehlerhafter Link${broken.length > 1 ? 's' : ''} gefunden</span>
+      <span style="color:#64748b;font-size:13px;margin-left:12px;">Spalte rechts zeigt, auf welcher Seite der Link vorkommt und wie der Ankertext lautet.</span>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>Fehlerhafte URL</th>
+          <th>HTTP-Status</th>
+          <th>Gefunden auf Seite / Ankertext</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+    }
+
+    function renderAdobe(data) {
+      const pages = data.pages || [];
+      const allHits = [];
+      pages.forEach(p => {
+        if (p.checks && p.checks.adobe_stock && p.checks.adobe_stock.found) {
+          (p.checks.adobe_stock.samples || []).forEach(s => { allHits.push({ pageUrl: p.url, ...s }); });
+        }
+      });
+      if (!allHits.length) {
+        $('panel-adobe').innerHTML = '<div class="card" style="padding:32px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">&#9989;</div><div class="ok" style="font-size:18px;font-weight:600;">Keine Adobe Stock Preview-Bilder!</div></div>';
+        return;
+      }
+      $('panel-adobe').innerHTML = `
+    <div class="card" style="margin-bottom:16px;padding:16px 20px;background:rgba(127,29,29,0.3);border-color:rgba(239,68,68,0.3);">
+      <div style="font-weight:600;color:#fca5a5;margin-bottom:4px;">&#9888; ${allHits.length} Adobe Stock Preview-Bild${allHits.length > 1 ? 'er' : ''} gefunden</div>
+      <div style="font-size:13px;color:#94a3b8;">Diese Bilder sind noch nicht lizenziert. Bitte lizenzieren oder ersetzen!</div>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table><thead><tr><th>Seite</th><th>Bild-URL</th><th>Erkennungsgrund</th><th>Tag</th></tr></thead>
+        <tbody>${allHits.map(h => `<tr>
+        <td style="font-size:12px;word-break:break-all;max-width:200px;"><a href="${esc(h.pageUrl)}" target="_blank" style="color:#60a5fa;text-decoration:none;">${esc(h.pageUrl)}</a></td>
+        <td style="font-size:11px;word-break:break-all;max-width:260px;color:#fde68a;">${esc(h.img_url || '')}</td>
+        <td style="font-size:11px;color:#fca5a5;">${esc(h.reason || '')}</td>
+        <td style="font-size:11px;color:#64748b;">&lt;${esc(h.tag || 'img')}&gt;</td>
+      </tr>`).join('')}</tbody></table>
+    </div>`;
+    }
+
+    function renderTechnical(data) {
+      const pages = data.pages || [];
+      const first = pages[0];
+      const fav = first && first.checks && first.checks.favicon;
+      const apple = first && first.checks && first.checks.apple_touch_icon;
+      function iconCard(title, check) {
+        if (!check) return `<div class="card" style="padding:20px;"><div style="font-weight:600;margin-bottom:8px;">${title}</div><p style="color:#64748b;font-size:13px;">Nicht geprueft.</p></div>`;
+        const sc = check.status === 'ok' ? '#22c55e' : check.status === 'warning' ? '#f59e0b' : '#ef4444';
+        const sl = check.status === 'ok' ? 'OK' : check.status === 'warning' ? 'Hinweis' : 'Fehler';
+        return `<div class="card" style="padding:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-weight:600;font-size:15px;">${title}</div>
+        <span class="badge" style="background:${sc}20;color:${sc};">${sl}</span>
+      </div>
+      <table style="font-size:12px;">
+        <tr class="check-row"><td style="color:#64748b;padding:5px 12px 5px 0;width:200px;">&lt;link&gt;-Tag vorhanden</td><td>${check.tag_present ? '<span class="ok">Ja</span>' : '<span class="err">Nein</span>'}</td></tr>
+        <tr class="check-row"><td style="color:#64748b;padding:5px 12px 5px 0;">Datei erreichbar</td><td>${check.found ? '<span class="ok">Ja</span>' : '<span class="err">Nein</span>'}</td></tr>
+        <tr class="check-row"><td style="color:#64748b;padding:5px 12px 5px 0;">HTTP-Status</td><td style="color:#94a3b8;">${check.status_code || '&#8211;'}</td></tr>
+        <tr class="check-row"><td style="color:#64748b;padding:5px 12px 5px 0;">Dateiname korrekt</td><td>${check.correct_name ? '<span class="ok">Ja</span>' : '<span class="warn">Nein (Hinweis)</span>'}</td></tr>
+        <tr class="check-row"><td style="color:#64748b;padding:5px 12px 5px 0;">Pfad</td><td style="word-break:break-all;color:#94a3b8;">${esc(check.href || '&#8211;')}</td></tr>
+      </table>
+      ${check.note && check.note !== 'Favicon korrekt eingebunden.' && check.note !== 'Apple Touch Icon korrekt eingebunden.' ? `<div style="margin-top:12px;padding:10px 12px;border-radius:6px;background:${check.status === 'warning' ? 'rgba(113,63,18,0.4)' : 'rgba(127,29,29,0.4)'};font-size:12px;color:${check.status === 'warning' ? '#fde68a' : '#fca5a5'};">&#9432; ${esc(check.note)}</div>` : ''}
+      <div style="margin-top:10px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.04);font-size:11px;color:#64748b;">
+        <strong style="color:#94a3b8;">Erwartet:</strong><br/>
+        ${title === 'Favicon' ? '&lt;link rel="icon" href="<strong>/pfad/<span style=\\\'color:#22c55e;\\\'>favicon.png</span></strong>" sizes="any"&gt;' : '&lt;link rel="apple-touch-icon" href="<strong>/pfad/<span style=\\\'color:#22c55e;\\\'>apple-touch-icon.png</span></strong>"&gt;'}
+      </div>
+    </div>`;
+      }
+      $('panel-technical').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;">
+      ${iconCard('Favicon', fav)}${iconCard('Apple Touch Icon', apple)}
+    </div>
+    <div class="card" style="margin-top:20px;padding:20px;">
+      <div style="font-weight:600;margin-bottom:12px;">Empfohlene Icon-Einbindung im HTML</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;">
+        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+          <div style="color:#60a5fa;font-weight:600;margin-bottom:6px;">Favicon</div>
+          <code style="color:#94a3b8;font-size:11px;">&lt;link
+rel="icon" href="/img/favicon.png" sizes="any"&gt;</code>
+          <div style="color:#64748b;margin-top:6px;">Dateiname: <code style="color:#22c55e;">favicon.png</code></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+          <div style="color:#60a5fa;font-weight:600;margin-bottom:6px;">Apple Touch Icon</div>
+          <code style="color:#94a3b8;font-size:11px;">&lt;link rel="apple-touch-icon" href="/img/apple-touch-icon.png"&gt;</code>
+          <div style="color:#64748b;margin-top:6px;">Dateiname: <code style="color:#22c55e;">apple-touch-icon.png</code></div>
+        </div>
+      </div>
+    </div>`;
+    }
+
+    function renderRobots(data) {
+      const robots = data.site_summary && data.site_summary.robots_txt || {};
+      $('panel-robots').innerHTML = `<div class="card" style="padding:24px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span style="font-size:32px;">${robots.found ? '&#9989;' : '&#10060;'}</span>
+      <div>
+        <div style="font-weight:600;font-size:16px;">${robots.found ? 'robots.txt gefunden' : 'robots.txt nicht gefunden'}</div>
+        <div style="font-size:13px;color:#64748b;">${esc(robots.url)}</div>
+      </div>
+      ${robots.disallows_all ? '<span class="badge b-err" style="margin-left:auto;">Disallow: / gesetzt!</span>' : ''}
+    </div>
+    ${robots.found ? `<pre style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;font-size:12px;overflow-x:auto;color:#cbd5e1;white-space:pre-wrap;">${esc(robots.content_preview || '(leer)')}</pre>` : '<p style="color:#64748b;font-size:14px;">Eine robots.txt wird für SEO empfohlen.</p>'}
+  </div>`;
+    }
+
+    function loadVersion() {
+      const el = document.getElementById("appVersion");
+      if (!el) return;
+
+      fetch("/health")
+        .then(res => res.json())
+        .then(data => {
+          if (data.version) {
+            el.textContent = "Version " + data.version;
+          } else {
+            el.textContent = "Version unbekannt";
+          }
+        })
+        .catch(() => {
+          el.textContent = "Version nicht verfügbar";
+        });
+    }
+  </script>
+
+  <footer class="mt-6 border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-3 text-right text-xs text-slate-500">
+      <span id="appVersion">Version wird geladen...</span>
+    </div>
+  </footer>
+
+</body>
+</html>
