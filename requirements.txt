@@ -3,5 +3,4 @@ uvicorn
 requests
 beautifulsoup4
 python-multipart
-sqlalchemy
 psycopg2-binary

@@ -39,7 +39,6 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from fastapi import Body, HTTPException, Depends, Header
 from pydantic import BaseModel, HttpUrl, Field
-from db import save_check_to_db
 
 
 class CheckRequest(BaseModel):
@@ -383,19 +382,6 @@ def register_routes(
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        check_id = str(uuid.uuid4())
-        try:
-            save_check_to_db(
-                check_id=check_id,
-                start_url=str(payload.url),
-                customer_id=payload.customer_id,
-                result=result,
-                status="done",
-            )
-        except Exception:
-            # Hier nach Wunsch loggen; Response soll trotzdem rausgehen
-            pass
-
         return result
 
 
@@ -414,17 +400,5 @@ def register_routes(
             )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-        check_id = str(uuid.uuid4())
-        try:
-            save_check_to_db(
-                check_id=check_id,
-                start_url=str(payload.url),
-                customer_id=payload.customer_id,
-                result=result,
-                status="done",
-            )
-        except Exception:
-            pass
-
+            
         return result

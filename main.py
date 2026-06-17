@@ -11,16 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 from typing import Optional
-from db import init_db, save_check_to_db
 
 VERSION = "1.0.0"
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
@@ -416,22 +411,6 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             "broken_links": broken_links,
             "crawled_count": len(results),
         }
-        # Kopie der Job-Daten für DB-Speicherung
-        job_data = jobs[job_id].copy()
-
-    # Außerhalb des Locks in die DB schreiben
-    try:
-        save_check_to_db(
-            check_id=job_id,
-            start_url=job_data.get("start_url"),
-            customer_id=job_data.get("customer_id"),
-            result=job_data["result"],
-            status=job_data.get("status", "done"),
-        )
-    except Exception:
-        # Hier könntest du noch Logging ergänzen
-        # z.B. logging.exception("Konnte Check nicht in DB speichern")
-        pass
 
 class StartRequest(BaseModel):
     url: str
