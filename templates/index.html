@@ -365,21 +365,7 @@
     const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const icon = ok => ok ? '<span class="ok">&#10004;</span>' : '<span class="err">&#10008;</span>';
     function onLocationChange() {
-  const input = $('locationInput');
-  const btn = $('optimizeButton');
-  if (!input || !btn) return;
-
-  const hasValue = input.value.trim().length > 0;
-  btn.disabled = !hasValue;
-
-  // optional: Optik anpassen
-  if (hasValue) {
-    btn.style.opacity = '1';
-    btn.style.cursor = 'pointer';
-  } else {
-    btn.style.opacity = '0.6';
-    btn.style.cursor = 'not-allowed';
-  }
+  refreshOptimizeButton();
 }
 
     const WEBHOOK_URL = '__WEBHOOK_URL__';
@@ -398,6 +384,11 @@ async function sendOptimizationWebhook() {
     return;
   }
 
+  const selectedIndexes = getSelectedIndexes();
+  if (!selectedIndexes.length) {
+    alert('Bitte mindestens eine URL markieren.');
+    return;
+  }
 
   // Button deaktivieren & Ladeindikator zeigen
   const btn = $('optimizeButton');
@@ -406,10 +397,12 @@ async function sendOptimizationWebhook() {
     btn.textContent = '⏳ KI optimiert...';
   }
 
-  const pages = globalData.pages || [];
+  const allPages = globalData.pages || [];
+  const pages = selectedIndexes.map(i => allPages[i]).filter(Boolean);
   const payload = {
-    crawled_page_count: pages.length,
-    crawled_count: globalData.crawled_count || pages.length,
+    crawled_page_count: allPages.length,
+    crawled_count: globalData.crawled_count || allPages.length,
+    selected_count: pages.length,
     location: location,
     pages: pages.map(p => {
       const checks = p.checks || {};
@@ -754,61 +747,14 @@ function renderCards(data) {
     </div>
   `).join('');
 
-  // NEU: Standort-Card als letzte Card
-  const locationCard = `
-    <div class="card" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px;">
-
-      <input
-        id="locationInput"
-        type="text"
-        placeholder="Standort"
-        oninput="onLocationChange()"
-        style="
-          background:rgba(15,23,42,0.9);
-          border:1px solid rgba(148,163,184,0.6);
-          color:#e2e8f0;
-          border-radius:8px;
-          padding:8px 10px;
-          font-size:14px;
-          width:100%;
-          outline:none;
-        "
-      />
-
-      <button
-        id="optimizeButton"
-        type="button"
-        onclick="sendOptimizationWebhook()"
-        disabled
-        style="
-          padding:10px 14px;
-          border-radius:999px;
-          border:none;
-          background:linear-gradient(90deg,#22c55e,#16a34a);
-          color:#fff;
-          font-weight:600;
-          font-size:12px;
-          opacity:0.6;
-          cursor:not-allowed;
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          gap:6px;
-        "
-      >
-        <span>Optimieren lassen</span>
-      </button>
-    </div>
-  `;
-
-  // Kennzahlen + Standort-Card zusammen in den Summary-Container rendern
-  $('summaryCards').innerHTML = summaryHtml + locationCard;
+  // Nur die Kennzahlen-Cards rendern (Standort/Optimieren ist jetzt über der Tabelle)
+  $('summaryCards').innerHTML = summaryHtml;
 }
 
     function renderOverview(data) {
       const pages = data.pages || [];
       if (!pages.length) { $('panel-overview').innerHTML = '<p style="color:#64748b;">Keine Seiten gecrawlt.</p>'; return; }
-      const rows = pages.map(p => {
+      const rows = pages.map((p, i) => {
         const c = p.checks || {}, idx = c.indexability || {}, title = c.title || {}, desc = c.meta_description || {}, h1 = c.h1 || {}, adobe = c.adobe_stock || {};
         const sc = (p.status_code >= 400 || !p.status_code) ? '#ef4444' : p.status_code >= 300 ? '#f59e0b' : '#22c55e';
         const fav = c.favicon;
@@ -816,6 +762,7 @@ function renderCards(data) {
         const favCell = fav ? (fav.status === 'ok' ? icon(true) : fav.status === 'warning' ? '<span class="warn" title="' + esc(fav.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
         const appleCell = apple ? (apple.status === 'ok' ? icon(true) : apple.status === 'warning' ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
         return `<tr>
+      <td style="text-align:center;width:36px;"><input type="checkbox" class="url-select" data-index="${i}" onchange="onRowSelectChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;"></td>
       <td style="max-width:240px;word-break:break-all;"><a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a></td>
       <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
       <td>${icon(!idx.noindex)}</td>
@@ -827,10 +774,60 @@ function renderCards(data) {
       <td>${favCell}</td><td>${appleCell}</td>
     </tr>`;
       }).join('');
-      $('panel-overview').innerHTML = `<div class="card" style="overflow-x:auto;"><table><thead><tr>
+      $('panel-overview').innerHTML = `
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" id="selectAll" onchange="onSelectAllChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
+      Alle markieren
+    </label>
+    <input id="locationInput" type="text" placeholder="Standort" oninput="onLocationChange()"
+      style="flex:1;min-width:180px;max-width:320px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.6);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;outline:none;">
+    <button id="optimizeButton" type="button" onclick="sendOptimizationWebhook()" disabled
+      style="padding:10px 18px;border-radius:999px;border:none;background:linear-gradient(90deg,#22c55e,#16a34a);color:#fff;font-weight:600;font-size:13px;opacity:0.6;cursor:not-allowed;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+      <span>Optimieren lassen</span>
+    </button>
+  </div>
+  <div class="card" style="overflow-x:auto;"><table><thead><tr>
+    <th style="width:36px;text-align:center;"></th>
     <th>URL</th><th>Status</th><th>Indexierbar</th><th>Title</th>
     <th>Meta Desc.</th><th>H1</th><th>Adobe Stock</th><th>Blindtext</th><th>Favicon</th><th>Apple Icon</th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    // Checkbox-Steuerung
+    function onSelectAllChange() {
+      const master = $('selectAll');
+      document.querySelectorAll('.url-select').forEach(cb => { cb.checked = master.checked; });
+      onRowSelectChange();
+    }
+
+    function onRowSelectChange() {
+      const boxes = Array.from(document.querySelectorAll('.url-select'));
+      const checked = boxes.filter(cb => cb.checked);
+      const master = $('selectAll');
+      if (master) {
+        master.checked = boxes.length > 0 && checked.length === boxes.length;
+        master.indeterminate = checked.length > 0 && checked.length < boxes.length;
+      }
+      refreshOptimizeButton();
+    }
+
+    function getSelectedIndexes() {
+      return Array.from(document.querySelectorAll('.url-select'))
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.dataset.index, 10));
+    }
+
+    function refreshOptimizeButton() {
+      const btn = $('optimizeButton');
+      if (!btn) return;
+      const loc = $('locationInput');
+      const hasLocation = loc && loc.value.trim().length > 0;
+      const hasSelection = getSelectedIndexes().length > 0;
+      const enabled = hasLocation && hasSelection;
+      btn.disabled = !enabled;
+      btn.style.opacity = enabled ? '1' : '0.6';
+      btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
     }
 
     function renderPages(data) {
