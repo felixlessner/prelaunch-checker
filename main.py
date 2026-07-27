@@ -11,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 from typing import Optional
+import unicodedata
+from typing import List
 
 VERSION = "1.0.0"
 
@@ -212,6 +214,134 @@ def check_apple_touch_icon(soup, origin, session):
         "note": "; ".join(note_parts) if note_parts else "Apple Touch Icon korrekt eingebunden.",
         "status": status,
     }
+
+# ============================
+# Rechtschreibprüfung (LanguageTool)
+# ============================
+
+LT_PUBLIC_API_BASE = "https://api.languagetool.org"
+
+# Nur Seiten prüfen, die nicht z.B. Impressum/Datenschutz sind
+DEFAULT_SKIP_CHECK_URL_PATTERNS = [
+    r"impressum",
+    r"datenschutz",
+    r"datenschutzerklaerung",
+    r"datenschutzerklärung",
+]
+
+# Nur Rechtschreib-/Tippfehler-Regeln berücksichtigen
+SPELLING_CATEGORY_HINTS = {"TYPOS", "MISSPELLING", "SPELLING"}
+
+
+def should_skip_spellcheck(url: str) -> bool:
+    for pat in DEFAULT_SKIP_CHECK_URL_PATTERNS:
+        if re.search(pat, url, flags=re.IGNORECASE):
+            return True
+    return False
+
+
+def normalize_for_spellcheck(text: str) -> str:
+    """Text für die Rechtschreibprüfung „reinigen“."""
+    text = unicodedata.normalize("NFC", text)
+
+    # Problematische/unsichtbare Zeichen entfernen
+    text = text.replace("\u00ad", "")  # Soft hyphen
+    text = text.replace("\u200b", "")  # Zero width space
+    text = text.replace("\u200c", "")  # Zero width non-joiner
+    text = text.replace("\u200d", "")  # Zero width joiner
+    text = text.replace("\ufeff", "")  # BOM
+
+    # NBSP normalisieren
+    text = text.replace("\u00a0", " ")
+    text = text.replace("\u202f", " ")
+
+    # Mehrfach-Leerzeichen reduzieren
+    text = re.sub(r"[ \t]+", " ", text)
+    return text
+
+
+def extract_text_for_spellcheck(html: str) -> str:
+    """
+    HTML in reinen Text umwandeln, Navigation/Script/CSS etc. entfernen –
+    angelehnt an app.py.extract_text_only.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Script/Style/Canvas/IFRAME usw. raus
+    for tag in soup(["script", "style", "noscript", "svg", "canvas", "iframe"]):
+        tag.decompose()
+
+    # Navigation & Footer raus, damit vor allem Content geprüft wird
+    for tag in soup.select("nav, footer, header, aside"):
+        tag.decompose()
+
+    text = soup.get_text(separator="\n")
+    lines = [ln.strip() for ln in text.splitlines()]
+    lines = [ln for ln in lines if ln]
+    return "\n".join(lines)
+
+
+def lt_public_check_spelling_only(text: str, language: str = "de-DE") -> list[dict]:
+    """
+    Ruft die öffentliche LanguageTool-API auf und filtert nur Rechtschreib-/Tippfehler.
+    """
+    endpoint = LT_PUBLIC_API_BASE.rstrip("/") + "/v2/check"
+
+    resp = rq.post(
+        endpoint,
+        data={"text": text, "language": language},
+        headers={"User-Agent": "BERENDSOHN-WebsiteSpellcheck/1.0 (fastapi)"},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    out: list[dict] = []
+    for m in data.get("matches", []):
+        rule = m.get("rule") or {}
+        cat = rule.get("category") or {}
+        cat_name = (cat.get("name") or "").upper()
+        rule_id = (rule.get("id") or "").upper()
+
+        is_spelling = (
+            cat_name in SPELLING_CATEGORY_HINTS
+            or "MORFOLOGIK_RULE" in rule_id
+            or "HUNSPELL" in rule_id
+            or "SPELL" in rule_id
+            or "TYPO" in rule_id
+        )
+        if not is_spelling:
+            continue
+
+        reps = m.get("replacements") or []
+        out.append(
+            {
+                "offset": int(m.get("offset", 0) or 0),
+                "length": int(m.get("length", 0) or 0),
+                "message": m.get("message", ""),
+                "replacements": ", ".join([r.get("value", "") for r in reps][:5]),
+            }
+        )
+    return out
+
+
+def highlight_snippet(text: str, offset: int, length: int, window: int = 70) -> str:
+    """
+    Kontext-Snippet mit <<Fehler>>-Markierung, wie in app.py.
+    """
+    offset = max(0, int(offset or 0))
+    length = max(0, int(length or 0))
+
+    start = max(0, offset - window)
+    end = min(len(text), offset + length + window)
+
+    before = text[start:offset].replace("\n", " ")
+    err = text[offset : offset + length].replace("\n", " ") if length > 0 else ""
+    after = text[offset + length : end].replace("\n", " ")
+
+    if err:
+        return f"{before} <<{err}>> {after}"
+    return f"{before} <<>> {after}"
 
 def crawl(start_url: str, max_pages: int, job_id: str):
     session = make_session()
@@ -442,6 +572,97 @@ def get_status(job_id: str):
     if not job:
         return JSONResponse({"error": "Job not found"}, status_code=404)
     return {"status": job["status"], "progress": job["progress"], "result": job["result"]}
+
+class SpellcheckPage(BaseModel):
+    url: str
+
+
+class SpellcheckRequest(BaseModel):
+    pages: List[SpellcheckPage]
+
+
+@app.post("/api/spellcheck")
+def spellcheck_pages(req: SpellcheckRequest):
+    """
+    Nimmt eine Liste von Seiten-URLs entgegen und führt eine Rechtschreibprüfung
+    pro Seite mit LanguageTool durch. Ergebnis: Liste von Hinweisen + Stats.
+    """
+    session = make_session()
+
+    checked_urls: set[str] = set()
+    results: list[dict] = []
+
+    for page in req.pages:
+        url = (page.url or "").strip()
+        if not url:
+            continue
+        if url in checked_urls:
+            continue
+        if should_skip_spellcheck(url):
+            # z.B. Impressum/Datenschutz – überspringen wie in app.py
+            continue
+
+        checked_urls.add(url)
+
+        resp, err = safe_get(session, url, timeout=20)
+        if err or resp is None or resp.status_code >= 400:
+            # Optional: Fehlerzeile ins Ergebnis aufnehmen
+            results.append(
+                {
+                    "url": url,
+                    "message": f"FETCH_FAILED: {err or resp.status_code}",
+                    "replacements": "",
+                    "snippet": "",
+                }
+            )
+            continue
+
+        html = resp.text
+        raw_text = extract_text_for_spellcheck(html)
+        text = normalize_for_spellcheck(raw_text)
+
+        # Seiten mit sehr wenig Text ignorieren
+        if len(text) < 40:
+            continue
+
+        try:
+            matches = lt_public_check_spelling_only(text, language="de-DE")
+        except Exception as e:
+            results.append(
+                {
+                    "url": url,
+                    "message": f"CHECK_FAILED: {e}",
+                    "replacements": "",
+                    "snippet": "",
+                }
+            )
+            continue
+
+        for m in matches:
+            off = int(m.get("offset", 0) or 0)
+            ln = int(m.get("length", 0) or 0)
+            snippet = highlight_snippet(text, off, ln)
+            results.append(
+                {
+                    "url": url,
+                    "message": m.get("message", ""),
+                    "replacements": m.get("replacements", ""),
+                    "snippet": snippet,
+                }
+            )
+
+    total_hints = len(results)
+    pages_with_hints = len({r["url"] for r in results if r.get("message")})
+
+    return {
+        "stats": {
+            "pages_requested": len(req.pages),
+            "pages_checked": len(checked_urls),
+            "total_hints": total_hints,
+            "pages_with_hints": pages_with_hints,
+        },
+        "results": results,
+    }
 
 @app.get("/health")
 def health():
