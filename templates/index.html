@@ -360,7 +360,7 @@
   </main>
 
   <script>
-    let jobId = null, pollTimer = null, globalData = null;
+    let jobId = null, pollTimer = null, globalData = null; spellcheckResults = [];
     const $ = id => document.getElementById(id);
     const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const icon = ok => ok ? '<span class="ok">&#10004;</span>' : '<span class="err">&#10008;</span>';
@@ -376,10 +376,18 @@ async function sendOptimizationWebhook() {
     return;
   }
 
+  const actionSelect = $('actionSelect');
+  const action = actionSelect ? (actionSelect.value || '') : '';
+  if (!action) {
+    alert('Bitte zuerst eine Aktion wählen.');
+    return;
+  }
+
   const locationInput = $('locationInput');
   const location = locationInput ? locationInput.value.trim() : '';
 
-  if (!location) {
+  // Standort nur für SEO-Optimierung erzwingen
+  if (action === 'seo' && !location) {
     alert('Bitte einen Standort eingeben.');
     return;
   }
@@ -394,101 +402,173 @@ async function sendOptimizationWebhook() {
   const btn = $('optimizeButton');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = '⏳ KI optimiert...';
+    btn.textContent = '⏳ wird ausgeführt...';
   }
 
   const allPages = globalData.pages || [];
   const pages = selectedIndexes.map(i => allPages[i]).filter(Boolean);
-  const payload = {
-    crawled_page_count: allPages.length,
-    crawled_count: globalData.crawled_count || allPages.length,
-    selected_count: pages.length,
-    location: location,
-    pages: pages.map(p => {
-      const checks = p.checks || {};
-      const title = checks.title || {};
-      const h1 = checks.h1 || {};
-      const meta = checks.meta_description || {};
-      const links = checks.links || {};
-      return {
-        url: p.url || '',
-        links: links.links || [],
-        h1: h1.texts || [],
-        title: title.text || '',
-        meta_description: meta.text || ''
-      };
-    })
-  };
 
   try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(300000) // 5 Minuten Timeout
-    });
+    if (action === 'seo') {
+      // --------------------------------------------------
+      // Weg 1: SEO-Optimierung via Webhook (bestehendes Verhalten)
+      // --------------------------------------------------
+      const payload = {
+        action, // Aktion mitgeben, falls du sie im Webhook unterscheiden willst
+        crawled_page_count: allPages.length,
+        crawled_count: globalData.crawled_count || allPages.length,
+        selected_count: pages.length,
+        location: location,
+        pages: pages.map(p => {
+          const checks = p.checks || {};
+          const title = checks.title || {};
+          const h1 = checks.h1 || {};
+          const meta = checks.meta_description || {};
+          const links = checks.links || {};
+          return {
+            url: p.url || '',
+            links: links.links || [],
+            h1: h1.texts || [],
+            title: title.text || '',
+            meta_description: meta.text || ''
+          };
+        })
+      };
 
-    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(300000)
+      });
 
-    const result = await res.json();
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
 
-// n8n gibt ein Array zurück → erstes Element nehmen
-const data = Array.isArray(result) ? result[0] : result;
+      const result = await res.json();
+      const data = Array.isArray(result) ? result[0] : result;
 
-if (data.success && data.optimized_pages) {
-  renderOptimizedResults(data.optimized_pages);
-} else {
-  alert('Unerwartetes Antwortformat vom Webhook.');
-}
+      if (data.success && data.optimized_pages) {
+        renderOptimizedResults(data.optimized_pages);
+      } else {
+        alert('Unerwartetes Antwortformat vom Webhook.');
+      }
+
+    } else if (action === 'spellcheck') {
+      // --------------------------------------------------
+      // Weg 2: Rechtschreibprüfung über /api/spellcheck
+      // --------------------------------------------------
+      const payload = {
+        pages: pages.map(p => ({ url: p.url || '' }))
+      };
+
+      const res = await fetch('/api/spellcheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(300000)
+      });
+
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
+
+      const spellData = await res.json();
+      renderSpellcheckResults(spellData);
+    }
 
   } catch (err) {
-    console.error('Webhook-Fehler:', err);
-    alert('Beim Senden an den Webhook ist ein Fehler aufgetreten: ' + err.message);
+    console.error('Fehler bei Aktion:', err);
+    alert('Beim Ausführen der Aktion ist ein Fehler aufgetreten: ' + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Optimieren lassen';
+      btn.textContent = 'Anwenden';
     }
   }
 }
 
-function renderOptimizedResults(optimizedPages) {
-  // Tab hinzufügen falls noch nicht vorhanden
-  const tabBar = document.querySelector('.tab-bar'); // ggf. anpassen
-  
-  const rows = optimizedPages.map(p => `
-    <tr>
-      <td style="max-width:200px;word-break:break-all;font-size:12px;">
-        <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;">${esc(p.url)}</a>
-      </td>
-      <td style="font-size:12px;">${esc(p.optimized_title || '')}</td>
-      <td style="font-size:12px;">${esc(p.optimized_meta_description || '')}</td>
-      <td style="font-size:12px;">${esc(p.optimized_h1 || '')}</td>
-    </tr>
-  `).join('');
+function onActionChange() {
+  const actionSelect = $('actionSelect');
+  const locationInput = $('locationInput');
+  const action = actionSelect ? (actionSelect.value || '') : '';
 
+  if (locationInput) {
+    // Standortfeld nur bei SEO-Optimierung anzeigen
+    locationInput.style.display = action === 'seo' ? 'inline-block' : 'none';
+  }
+
+  refreshOptimizeButton();
+}
+
+function renderSpellcheckResults(payload) {
+  const results = payload && Array.isArray(payload.results) ? payload.results : [];
+  const stats = payload && payload.stats ? payload.stats : {};
+
+  // Global speichern für den Filter
+  spellcheckResults = results;
+
+  const totalHints = stats.total_hints != null ? stats.total_hints : results.length;
+  const pagesChecked = stats.pages_checked != null ? stats.pages_checked : 0;
+  const pagesWithHints = stats.pages_with_hints != null ? stats.pages_with_hints : 0;
+
+  // Eindeutige URLs für das Filter-Dropdown
+  const urlSet = new Set();
+  results.forEach(r => {
+    if (r.url) urlSet.add(r.url);
+  });
+  const urls = Array.from(urlSet);
+
+  // Tabelle selbst nur noch als "Hülle" – Zeilen rendert später updateSpellcheckTableForFilter()
   const html = `
     <div class="card fade-in" style="margin-top:24px;overflow-x:auto;">
-      <div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,0.2);">
-        <span style="font-weight:700;font-size:15px;">✨ KI-optimierte SEO-Merkmale</span>
-        <span style="color:#64748b;font-size:12px;margin-left:12px;">${optimizedPages.length} Seite/n optimiert</span>
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,0.2);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:15px;">🔎 Rechtschreibprüfung</span>
+        <span style="color:#64748b;font-size:12px;">
+          Geprüfte Seiten: ${pagesChecked} ·
+          Seiten mit Hinweisen: ${pagesWithHints} ·
+          Hinweise gesamt: ${totalHints}
+        </span>
+        ${urls.length > 0 ? `
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <label for="spellUrlFilter" style="font-size:12px;color:#cbd5e1;">URL filtern:</label>
+            <select id="spellUrlFilter"
+                    onchange="updateSpellcheckTableForFilter()"
+                    style="min-width:220px;max-width:320px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.6);color:#e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;">
+              <option value="">(alle)</option>
+              ${urls.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('')}
+            </select>
+          </div>
+        ` : ''}
       </div>
-      <table>
-        <thead><tr>
-          <th>URL</th>
-          <th>Optimierter Title</th>
-          <th>Optimierte Meta Description</th>
-          <th>Optimierte H1</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+      ${
+        results.length === 0
+          ? `<div style="padding:20px;font-size:14px;color:#22c55e;">
+               ✅ Keine Rechtschreib-Hinweise für die ausgewählten Seiten gefunden.
+             </div>`
+          : `
+            <table>
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Hinweis</th>
+                  <th>Vorschläge</th>
+                  <th>Kontext</th>
+                </tr>
+              </thead>
+              <tbody id="spellcheckTbody">
+                <!-- Zeilen werden per updateSpellcheckTableForFilter() eingefügt -->
+              </tbody>
+            </table>
+          `
+      }
     </div>
   `;
 
-  // Ergebnis unterhalb der bestehenden Ergebnisse einfügen
   const resultsSection = $('resultsSection');
-  
-  // Altes Optimierungs-Panel entfernen falls vorhanden
+
+  // Vorheriges Panel (SEO-Optimierung oder Spellcheck) entfernen
   const existing = $('optimized-panel');
   if (existing) existing.remove();
 
@@ -497,8 +577,54 @@ function renderOptimizedResults(optimizedPages) {
   div.innerHTML = html;
   resultsSection.appendChild(div);
 
-  // Runterscrollen
-  div.scrollIntoView({ behavior: 'smooth' });
+  // Wenn es Ergebnisse gibt, initial "alle" anzeigen
+  if (results.length > 0) {
+    updateSpellcheckTableForFilter();
+    div.scrollIntoView({ behavior: 'smooth' });
+  } else {
+    div.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function updateSpellcheckTableForFilter() {
+  const tbody = $('spellcheckTbody');
+  if (!tbody) return;
+
+  const select = $('spellUrlFilter');
+  const selectedUrl = select ? (select.value || '') : '';
+
+  let filtered = spellcheckResults || [];
+  if (selectedUrl) {
+    filtered = filtered.filter(r => (r.url || '') === selectedUrl);
+  }
+
+  if (!filtered.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="padding:16px;font-size:13px;color:#64748b;text-align:center;">
+          Keine Hinweise für diese URL.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const rows = filtered.map(r => `
+    <tr>
+      <td style="max-width:200px;word-break:break-all;font-size:12px;">
+        <a href="${esc(r.url || '')}" target="_blank" style="color:#60a5fa;">
+          ${esc(r.url || '')}
+        </a>
+      </td>
+      <td style="font-size:12px;">${esc(r.message || '')}</td>
+      <td style="font-size:12px;">${esc(r.replacements || '')}</td>
+      <td style="font-size:12px;max-width:360px;word-break:break-word;">
+        ${esc(r.snippet || '')}
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.innerHTML = rows;
 }
 
     async function startCheck() {
@@ -751,48 +877,101 @@ function renderCards(data) {
   $('summaryCards').innerHTML = summaryHtml;
 }
 
-    function renderOverview(data) {
-      const pages = data.pages || [];
-      if (!pages.length) { $('panel-overview').innerHTML = '<p style="color:#64748b;">Keine Seiten gecrawlt.</p>'; return; }
-      const rows = pages.map((p, i) => {
-        const c = p.checks || {}, idx = c.indexability || {}, title = c.title || {}, desc = c.meta_description || {}, h1 = c.h1 || {}, adobe = c.adobe_stock || {};
-        const sc = (p.status_code >= 400 || !p.status_code) ? '#ef4444' : p.status_code >= 300 ? '#f59e0b' : '#22c55e';
-        const fav = c.favicon;
-        const apple = c.apple_touch_icon;
-        const favCell = fav ? (fav.status === 'ok' ? icon(true) : fav.status === 'warning' ? '<span class="warn" title="' + esc(fav.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
-        const appleCell = apple ? (apple.status === 'ok' ? icon(true) : apple.status === 'warning' ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>' : icon(false)) : '<span style="color:#475569;">&#8211;</span>';
-        return `<tr>
-      <td style="text-align:center;width:36px;"><input type="checkbox" class="url-select" data-index="${i}" onchange="onRowSelectChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;"></td>
-      <td style="max-width:240px;word-break:break-all;"><a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a></td>
+function renderOverview(data) {
+  const pages = data.pages || [];
+  if (!pages.length) {
+    $('panel-overview').innerHTML = '<p style="color:#64748b;">Keine Seiten gecrawlt.</p>';
+    return;
+  }
+
+  const rows = pages.map((p, i) => {
+    const c = p.checks || {},
+      idx = c.indexability || {},
+      title = c.title || {},
+      desc = c.meta_description || {},
+      h1 = c.h1 || {},
+      adobe = c.adobe_stock || {};
+    const sc = (p.status_code >= 400 || !p.status_code) ? '#ef4444' :
+               p.status_code >= 300 ? '#f59e0b' : '#22c55e';
+    const fav = c.favicon;
+    const apple = c.apple_touch_icon;
+    const favCell = fav ? (fav.status === 'ok' ? icon(true) :
+                    fav.status === 'warning'
+                      ? '<span class="warn" title="' + esc(fav.note) + '">&#9888;</span>'
+                      : icon(false))
+                  : '<span style="color:#475569;">&#8211;</span>';
+    const appleCell = apple ? (apple.status === 'ok' ? icon(true) :
+                      apple.status === 'warning'
+                        ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>'
+                        : icon(false))
+                    : '<span style="color:#475569;">&#8211;</span>';
+
+    return `<tr>
+      <td style="text-align:center;width:36px;">
+        <input type="checkbox" class="url-select" data-index="${i}" onchange="onRowSelectChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
+      </td>
+      <td style="max-width:240px;word-break:break-all;">
+        <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a>
+      </td>
       <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
       <td>${icon(!idx.noindex)}</td>
       <td>${icon(!title.missing)}${title.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${title.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
       <td>${icon(!desc.missing)}${desc.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${desc.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
       <td>${h1.missing ? icon(false) : h1.multiple ? '<span class="warn">&#9888; ' + h1.count + 'x</span>' : icon(true)}</td>
       <td>${icon(!adobe.found)}${adobe.found ? ' <span class="err" style="font-size:10px;">(' + adobe.count + ')</span>' : ''}</td>
-      <td>${(() => { const bt = c.blindtext || {}; return bt.found ? '<span class="err">&#9888; ' + bt.count + 'x</span>' : icon(true); })()}</td>
-      <td>${favCell}</td><td>${appleCell}</td>
+      <td>${(() => {
+        const bt = c.blindtext || {};
+        return bt.found ? '<span class="err">&#9888; ' + bt.count + 'x</span>' : icon(true);
+      })()}</td>
+      <td>${favCell}</td>
+      <td>${appleCell}</td>
     </tr>`;
-      }).join('');
-      $('panel-overview').innerHTML = `
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
-    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" id="selectAll" onchange="onSelectAllChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
-      Alle markieren
-    </label>
-    <input id="locationInput" type="text" placeholder="Standort" oninput="onLocationChange()"
-      style="flex:1;min-width:180px;max-width:320px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.6);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;outline:none;">
-    <button id="optimizeButton" type="button" onclick="sendOptimizationWebhook()" disabled
-      style="padding:10px 18px;border-radius:999px;border:none;background:linear-gradient(90deg,#22c55e,#16a34a);color:#fff;font-weight:600;font-size:13px;opacity:0.6;cursor:not-allowed;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-      <span>Optimieren lassen</span>
-    </button>
-  </div>
-  <div class="card" style="overflow-x:auto;"><table><thead><tr>
-    <th style="width:36px;text-align:center;"></th>
-    <th>URL</th><th>Status</th><th>Indexierbar</th><th>Title</th>
-    <th>Meta Desc.</th><th>H1</th><th>Adobe Stock</th><th>Blindtext</th><th>Favicon</th><th>Apple Icon</th>
-  </tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
+  }).join('');
+
+  $('panel-overview').innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;cursor:pointer;white-space:nowrap;">
+        <input type="checkbox" id="selectAll" onchange="onSelectAllChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
+        Alle markieren
+      </label>
+
+      <select id="actionSelect" onchange="onActionChange()"
+        style="min-width:220px;max-width:260px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.6);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;outline:none;">
+        <option value="" selected disabled>Aktion wählen</option>
+        <option value="seo">Title, Meta, H1 optimieren</option>
+        <option value="spellcheck">Rechtschreibung prüfen</option>
+      </select>
+
+      <input id="locationInput" type="text" placeholder="Standort" oninput="onLocationChange()"
+        style="flex:1;min-width:180px;max-width:320px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.6);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;outline:none;display:none;">
+
+      <button id="optimizeButton" type="button" onclick="sendOptimizationWebhook()" disabled
+        style="padding:10px 18px;border-radius:999px;border:none;background:linear-gradient(90deg,#22c55e,#16a34a);color:#fff;font-weight:600;font-size:13px;opacity:0.6;cursor:not-allowed;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+        <span>Anwenden</span>
+      </button>
+    </div>
+
+    <div class="card" style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center;"></th>
+            <th>URL</th>
+            <th>Status</th>
+            <th>Indexierbar</th>
+            <th>Title</th>
+            <th>Meta Desc.</th>
+            <th>H1</th>
+            <th>Adobe Stock</th>
+            <th>Blindtext</th>
+            <th>Favicon</th>
+            <th>Apple Icon</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
 
     // Checkbox-Steuerung
     function onSelectAllChange() {
@@ -821,10 +1000,28 @@ function renderCards(data) {
     function refreshOptimizeButton() {
       const btn = $('optimizeButton');
       if (!btn) return;
+
+      const actionSelect = $('actionSelect');
+      const action = actionSelect ? (actionSelect.value || '') : '';
+
       const loc = $('locationInput');
       const hasLocation = loc && loc.value.trim().length > 0;
       const hasSelection = getSelectedIndexes().length > 0;
-      const enabled = hasLocation && hasSelection;
+
+      let enabled = false;
+
+      // Aktion muss gewählt sein
+      if (action === 'seo') {
+        // SEO: Auswahl + Standort nötig
+        enabled = hasSelection && hasLocation;
+      } else if (action === 'spellcheck') {
+        // Rechtschreibung: nur Auswahl nötig
+        enabled = hasSelection;
+      } else {
+        // keine Aktion gewählt → Button deaktiviert
+        enabled = false;
+      }
+
       btn.disabled = !enabled;
       btn.style.opacity = enabled ? '1' : '0.6';
       btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
