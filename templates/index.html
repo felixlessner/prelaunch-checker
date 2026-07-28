@@ -502,6 +502,99 @@ function onActionChange() {
   refreshOptimizeButton();
 }
 
+function renderOptimizedResults(optimizedPages) {
+    // Sicherheitscheck auf sinnvolle Daten
+    if (!Array.isArray(optimizedPages) || !optimizedPages.length) {
+        alert('Der Webhook hat keine Optimierungsergebnisse zurückgegeben.');
+        return;
+    }
+
+    const allPages = (globalData && Array.isArray(globalData.pages))
+        ? globalData.pages
+        : [];
+
+    const rows = optimizedPages.map(opt => {
+        const url = opt.url || '';
+
+        // Originaldaten aus der Analyse finden (für "Alt"-Spalte)
+        const original = allPages.find(p => (p.url || '') === url) || null;
+        const checks = original && original.checks ? original.checks : {};
+
+        const origTitle = (checks.title && checks.title.text) || '';
+        const origMeta = (checks.meta_description && checks.meta_description.text) || '';
+        const origH1 = (checks.h1 && Array.isArray(checks.h1.texts) && checks.h1.texts[0]) || '';
+
+        const newTitle = opt.optimized_title || '';
+        const newMeta = opt.optimized_meta_description || '';
+        const newH1 = opt.optimized_h1 || '';
+
+        return `
+            <tr>
+                <td style="max-width:220px;word-break:break-all;font-size:12px;">
+                    <a href="${esc(url)}" target="_blank" style="color:#60a5fa;text-decoration:none;">
+                        ${esc(url)}
+                    </a>
+                </td>
+                <td style="font-size:12px;">
+                    <div style="color:#64748b;font-size:11px;margin-bottom:2px;">Alt</div>
+                    <div>${esc(origTitle || '(nicht vorhanden)')}</div>
+                    <div style="color:#64748b;font-size:11px;margin:6px 0 2px;">Neu</div>
+                    <div style="color:#bbf7d0;">${esc(newTitle || '(keine Angabe)')}</div>
+                </td>
+                <td style="font-size:12px;">
+                    <div style="color:#64748b;font-size:11px;margin-bottom:2px;">Alt</div>
+                    <div>${esc(origMeta || '(nicht vorhanden)')}</div>
+                    <div style="color:#64748b;font-size:11px;margin:6px 0 2px;">Neu</div>
+                    <div style="color:#bbf7d0;">${esc(newMeta || '(keine Angabe)')}</div>
+                </td>
+                <td style="font-size:12px;">
+                    <div style="color:#64748b;font-size:11px;margin-bottom:2px;">Alt</div>
+                    <div>${esc(origH1 || '(nicht vorhanden)')}</div>
+                    <div style="color:#64748b;font-size:11px;margin:6px 0 2px;">Neu</div>
+                    <div style="color:#bbf7d0;">${esc(newH1 || '(keine Angabe)')}</div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const html = `
+        <div class="card fade-in" style="margin-top:24px;overflow-x:auto;">
+            <div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,0.2);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span style="font-weight:700;font-size:15px;">✨ Optimierte SEO-Metriken</span>
+                <span style="color:#64748b;font-size:12px;">
+                    Optimierte Seiten: ${optimizedPages.length}
+                </span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th>Title (alt / neu)</th>
+                        <th>Meta Description (alt / neu)</th>
+                        <th>H1 (alt / neu)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    const resultsSection = $('resultsSection');
+
+    // Vorheriges Optimierungs-Panel (SEO oder Spellcheck) entfernen
+    const existing = $('optimized-panel');
+    if (existing) existing.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'optimized-panel';
+    wrapper.innerHTML = html;
+    resultsSection.appendChild(wrapper);
+
+    wrapper.scrollIntoView({ behavior: 'smooth' });
+}
+
 function renderSpellcheckResults(payload) {
   const results = payload && Array.isArray(payload.results) ? payload.results : [];
   const stats = payload && payload.stats ? payload.stats : {};
