@@ -129,67 +129,67 @@ def register_routes(
                 continue
             visited.add(url)
 
-        resp, err = safe_get(session, url)
-        page: Dict[str, Any] = {
-            "url": url,
-            "error": err,
-            "status_code": None,
-            "final_status_code": None,
-            "html": None,
-            "final_url": url,
-            "redirected": False,
-            "redirect_chain": [],
-        }
+            resp, err = safe_get(session, url)
+            page: Dict[str, Any] = {
+                "url": url,
+                "error": err,
+                "status_code": None,
+                "final_status_code": None,
+                "html": None,
+                "final_url": url,
+                "redirected": False,
+                "redirect_chain": [],
+            }
 
-        if resp is not None:
-            history = resp.history
+            if resp is not None:
+                history = resp.history
 
-            # Status der angefragten URL; bei Redirects z. B. 301
-            page["status_code"] = (
-                history[0].status_code if history else resp.status_code
-            )
-            # Status der endgültigen Zielantwort; z. B. 200
-            page["final_status_code"] = resp.status_code
-            page["final_url"] = str(resp.url)
-            page["redirected"] = bool(history)
-            page["redirect_chain"] = [
-                {
-                    "url": r.url,
-                    "status_code": r.status_code,
-                    "location": r.headers.get("Location"),
-                }
-                for r in history
-            ]
+                # Status der angefragten URL; bei Redirects z. B. 301
+                page["status_code"] = (
+                    history[0].status_code if history else resp.status_code
+                )
+                # Status der endgültigen Zielantwort; z. B. 200
+                page["final_status_code"] = resp.status_code
+                page["final_url"] = str(resp.url)
+                page["redirected"] = bool(history)
+                page["redirect_chain"] = [
+                    {
+                        "url": r.url,
+                        "status_code": r.status_code,
+                        "location": r.headers.get("Location"),
+                    }
+                    for r in history
+                ]
 
-            ct = resp.headers.get("content-type", "")
+                ct = resp.headers.get("content-type", "")
 
-            if page["redirected"]:
-                # Zielseite separat in die Crawl-Queue aufnehmen.
-                # Den Inhalt der Zielseite nicht der Redirect-URL zuordnen.
-                target = page["final_url"]
-                if (
-                    "text/html" in ct
-                    and same_domain(start_url, target)
-                    and target not in visited
-                    and target not in queue
-                ):
-                    queue.append(target)
-
-            elif "text/html" in ct:
-                page["html"] = resp.text
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for a in soup.find_all("a", href=True):
-                    href = normalize(url, a["href"])
+                if page["redirected"]:
+                    # Zielseite separat in die Crawl-Queue aufnehmen.
+                    # Den Inhalt der Zielseite nicht der Redirect-URL zuordnen.
+                    target = page["final_url"]
                     if (
-                        href
-                        and same_domain(start_url, href)
-                        and href not in visited
-                        and href not in queue
-                        and is_html_url(href)
+                        "text/html" in ct
+                        and same_domain(start_url, target)
+                        and target not in visited
+                        and target not in queue
                     ):
-                        queue.append(href)
+                        queue.append(target)
 
-        pages.append(page)
+                elif "text/html" in ct:
+                    page["html"] = resp.text
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for a in soup.find_all("a", href=True):
+                        href = normalize(url, a["href"])
+                        if (
+                            href
+                            and same_domain(start_url, href)
+                            and href not in visited
+                            and href not in queue
+                            and is_html_url(href)
+                        ):
+                            queue.append(href)
+
+            pages.append(page)
 
         # robots.txt summary (analog zu main.py)
         base_parsed = urlparse(start_url)
