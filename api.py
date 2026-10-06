@@ -129,33 +129,67 @@ def register_routes(
                 continue
             visited.add(url)
 
-            resp, err = safe_get(session, url)
-            page: Dict[str, Any] = {
-                "url": url,
-                "error": err,
-                "status_code": None,
-                "html": None,
-                "final_url": url,
-            }
+        resp, err = safe_get(session, url)
+        page: Dict[str, Any] = {
+            "url": url,
+            "error": err,
+            "status_code": None,
+            "final_status_code": None,
+            "html": None,
+            "final_url": url,
+            "redirected": False,
+            "redirect_chain": [],
+        }
 
-            if resp is not None:
-                page["status_code"] = resp.status_code
-                page["final_url"] = str(resp.url)
-                ct = resp.headers.get("content-type", "")
-                if "text/html" in ct:
-                    page["html"] = resp.text
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    for a in soup.find_all("a", href=True):
-                        href = normalize(url, a["href"])
-                        if (
-                            href
-                            and same_domain(start_url, href)
-                            and href not in visited
-                            and is_html_url(href)
-                        ):
-                            queue.append(href)
+        if resp is not None:
+            history = resp.history
 
-            pages.append(page)
+            # Status der angefragten URL; bei Redirects z. B. 301
+            page["status_code"] = (
+                history[0].status_code if history else resp.status_code
+            )
+            # Status der endgültigen Zielantwort; z. B. 200
+            page["final_status_code"] = resp.status_code
+            page["final_url"] = str(resp.url)
+            page["redirected"] = bool(history)
+            page["redirect_chain"] = [
+                {
+                    "url": r.url,
+                    "status_code": r.status_code,
+                    "location": r.headers.get("Location"),
+                }
+                for r in history
+            ]
+
+            ct = resp.headers.get("content-type", "")
+
+            if page["redirected"]:
+                # Zielseite separat in die Crawl-Queue aufnehmen.
+                # Den Inhalt der Zielseite nicht der Redirect-URL zuordnen.
+                target = page["final_url"]
+                if (
+                    "text/html" in ct
+                    and same_domain(start_url, target)
+                    and target not in visited
+                    and target not in queue
+                ):
+                    queue.append(target)
+
+            elif "text/html" in ct:
+                page["html"] = resp.text
+                soup = BeautifulSoup(resp.text, "html.parser")
+                for a in soup.find_all("a", href=True):
+                    href = normalize(url, a["href"])
+                    if (
+                        href
+                        and same_domain(start_url, href)
+                        and href not in visited
+                        and href not in queue
+                        and is_html_url(href)
+                    ):
+                        queue.append(href)
+
+        pages.append(page)
 
         # robots.txt summary (analog zu main.py)
         base_parsed = urlparse(start_url)
@@ -183,6 +217,29 @@ def register_routes(
         all_links: Dict[str, List[Dict[str, str]]] = {}
 
         for i, p in enumerate(pages):
+            if p.get("redirected"):
+                results.append(
+                    {
+                        "url": p["url"],
+                        "status_code": p["status_code"],
+                        "final_status_code": p["final_status_code"],
+                        "final_url": p["final_url"],
+                        "redirected": True,
+                        "redirect_chain": p["redirect_chain"],
+                        "checks": {
+                            "indexability": {
+                                "indexable": False,
+                                "is_redirect": True,
+                                "redirect_to": p["final_url"],
+                                "noindex": False,
+                                "meta_robots": "nicht geprüft",
+                                "canonical": None,
+                                "robots_txt_disallows": False,
+                            }
+                        },
+                    }
+                )
+                continue
             if p.get("error") or not p.get("html"):
                 # Seite konnte nicht geladen werden oder war kein HTML
                 results.append(
@@ -190,7 +247,9 @@ def register_routes(
                         "url": p["url"],
                         "error": p.get("error", "No HTML"),
                         "status_code": p.get("status_code"),
+                        "final_status_code": p.get("final_status_code"),
                         "final_url": p.get("final_url"),
+                        "redirected": p.get("redirected", False),
                         "checks": {},
                     }
                 )
@@ -314,7 +373,9 @@ def register_routes(
                 {
                     "url": p["url"],
                     "status_code": p.get("status_code"),
+                    "final_status_code": p.get("final_status_code"),
                     "final_url": p.get("final_url"),
+                    "redirected": p.get("redirected", False),
                     "checks": checks,
                 }
             )
