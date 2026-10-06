@@ -1027,7 +1027,7 @@ function renderOverview(data) {
         <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a>
       </td>
       <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
-      <td>${icon(!idx.noindex)}</td>
+      <td>${icon(idx.indexable ?? !idx.noindex)}</td>
       <td>${icon(!title.missing)}${title.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${title.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
       <td>${icon(!desc.missing)}${desc.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${desc.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
       <td>${h1.missing ? icon(false) : h1.multiple ? '<span class="warn">&#9888; ' + h1.count + 'x</span>' : icon(true)}</td>
@@ -1144,6 +1144,26 @@ function renderOverview(data) {
       $('panel-pages').innerHTML = (data.pages || []).map((p, i) => {
         const c = p.checks || {}, idx = c.indexability || {}, title = c.title || {}, desc = c.meta_description || {},
           h1 = c.h1 || {}, adobe = c.adobe_stock || {}, fav = c.favicon, apple = c.apple_touch_icon;
+        if (p.redirected || idx.is_redirect) {
+          const target = p.final_url || idx.redirect_to || '';
+
+          return `<details class="card fade-in" style="margin-bottom:10px;padding:0;" ${i < 2 ? 'open' : ''}>
+            <summary style="padding:14px 20px;display:flex;align-items:center;gap:10px;">
+              <span>&#9888;&#65039;</span>
+              <span style="flex:1;font-size:13px;font-weight:500;word-break:break-all;">${esc(p.url)}</span>
+              <span class="badge b-warn">HTTP ${p.status_code || 'ERR'}</span>
+            </summary>
+            <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.06);">
+              <div class="err">Weiterleitung – diese URL ist nicht indexierbar.</div>
+              ${target ? `<div style="margin-top:6px;">Weitergeleitet nach:
+                <a href="${esc(target)}" target="_blank" style="color:#60a5fa;">${esc(target)}</a>
+              </div>` : ''}
+              <div style="margin-top:6px;color:#94a3b8;">
+                Status der Zielseite: HTTP ${p.final_status_code || '–'}
+              </div>
+            </div>
+          </details>`;
+        }
         const issues = [];
         if (idx.noindex) issues.push('NoIndex');
         if (title.missing) issues.push('Kein Title');
