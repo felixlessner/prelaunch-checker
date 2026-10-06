@@ -14,7 +14,7 @@ from typing import Optional
 import unicodedata
 from typing import List
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -547,11 +547,10 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             if href not in all_links:
                 all_links[href] = []
             # Maximal 5 Quellen pro Link speichern
-            if len(all_links[href]) < 5:
-                all_links[href].append({
-                    "page_url": p["url"],
-                    "anchor_text": anchor_text,
-                })
+            all_links[href].append({
+                "page_url": p["url"],
+                "anchor_text": anchor_text,
+            })
         checks["links"] = {"count": len(page_links), "links": page_links[:100]}
 
         # Adobe Stock
@@ -576,6 +575,11 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             "final_url": p.get("final_url"),
             "checks": checks,
         })
+
+    for result in results:
+        if result.get("status_code") == 301:
+            redirect_url = normalize(start_url, result["url"]) or result["url"]
+            result["link_sources"] = all_links.get(redirect_url, [])
 
     with lock:
         jobs[job_id]["progress"] = 80
