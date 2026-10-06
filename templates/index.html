@@ -1018,27 +1018,53 @@ function renderOverview(data) {
                         ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>'
                         : icon(false))
                     : '<span style="color:#475569;">&#8211;</span>';
+    const linkSourcesHtml = (p.link_sources || []).map(source => `
+      <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
+        Link von:
+        <a href="${esc(source.page_url)}" target="_blank"
+          style="color:#60a5fa;text-decoration:none;">
+          ${esc(source.page_url)}
+        </a>
+        · Ankertext:
+        <span style="color:#fde68a;">„${esc(source.anchor_text || '(kein Ankertext)')}“</span>
+      </div>
+    `).join('');
 
-    return `<tr>
-      <td style="text-align:center;width:36px;">
-        <input type="checkbox" class="url-select" data-index="${i}" onchange="onRowSelectChange()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
-      </td>
-      <td style="max-width:240px;word-break:break-all;">
-        <a href="${esc(p.url)}" target="_blank" style="color:#60a5fa;text-decoration:none;font-size:12px;">${esc(p.url)}</a>
-      </td>
-      <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
-      <td>${icon(idx.indexable ?? !idx.noindex)}</td>
-      <td>${icon(!title.missing)}${title.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${title.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
-      <td>${icon(!desc.missing)}${desc.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${desc.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
-      <td>${h1.missing ? icon(false) : h1.multiple ? '<span class="warn">&#9888; ' + h1.count + 'x</span>' : icon(true)}</td>
-      <td>${icon(!adobe.found)}${adobe.found ? ' <span class="err" style="font-size:10px;">(' + adobe.count + ')</span>' : ''}</td>
-      <td>${(() => {
-        const bt = c.blindtext || {};
-        return bt.found ? '<span class="err">&#9888; ' + bt.count + 'x</span>' : icon(true);
-      })()}</td>
-      <td>${favCell}</td>
-      <td>${appleCell}</td>
-    </tr>`;
+    return `
+      <tr>
+        <td style="text-align:center;width:36px;">
+          <input type="checkbox" class="url-select" data-index="${i}"
+            onchange="onRowSelectChange()"
+            style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
+        </td>
+        <td style="max-width:240px;word-break:break-all;">
+          <a href="${esc(p.url)}" target="_blank"
+            style="color:#60a5fa;text-decoration:none;font-size:12px;">
+            ${esc(p.url)}
+          </a>
+        </td>
+        <td><span style="color:${sc};font-weight:700;">${p.status_code || 'ERR'}</span></td>
+        <td>${icon(idx.indexable ?? !idx.noindex)}</td>
+        <td>${icon(!title.missing)}${title.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${title.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
+        <td>${icon(!desc.missing)}${desc.too_long ? ' <span class="warn" style="font-size:10px;">lang</span>' : ''}${desc.too_short ? ' <span class="warn" style="font-size:10px;">kurz</span>' : ''}</td>
+        <td>${h1.missing ? icon(false) : h1.multiple ? '<span class="warn">&#9888; ' + h1.count + 'x</span>' : icon(true)}</td>
+        <td>${icon(!adobe.found)}${adobe.found ? ' <span class="err" style="font-size:10px;">(' + adobe.count + ')</span>' : ''}</td>
+        <td>${(() => {
+          const bt = c.blindtext || {};
+          return bt.found ? '<span class="err">&#9888; ' + bt.count + 'x</span>' : icon(true);
+        })()}</td>
+        <td>${favCell}</td>
+        <td>${appleCell}</td>
+      </tr>
+      ${Number(p.status_code) === 301 && linkSourcesHtml ? `
+        <tr>
+          <td colspan="11"
+              style="padding:2px 12px 8px 48px;background:rgba(255,255,255,0.02);">
+            ${linkSourcesHtml}
+          </td>
+        </tr>
+      ` : ''}
+    `;
   }).join('');
 
   $('panel-overview').innerHTML = `
