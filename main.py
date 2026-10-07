@@ -14,7 +14,7 @@ from typing import Optional
 import unicodedata
 from typing import List
 
-VERSION = "1.4.4"
+VERSION = "1.4.5"
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
