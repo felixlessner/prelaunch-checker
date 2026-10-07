@@ -14,7 +14,7 @@ from typing import Optional
 import unicodedata
 from typing import List
 
-VERSION = "1.4.3"
+VERSION = "1.4.4"
 
 app = FastAPI(title="Pre-Launch Checker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -611,6 +611,7 @@ def crawl(start_url: str, max_pages: int, job_id: str):
             "site_summary": site_summary,
             "pages": results,
             "broken_links": broken_links,
+            "broken_links_count": len(broken_links),
             "crawled_count": len(results),
         }
 

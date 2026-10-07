@@ -420,6 +420,7 @@ def register_routes(
             "site_summary": site_summary,
             "pages": results,
             "broken_links": broken_links,
+            "broken_links_count": len(broken_links),
             "crawled_count": len(results),
         }
 
