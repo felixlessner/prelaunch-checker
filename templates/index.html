@@ -279,6 +279,35 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     a:hover {
       color: #93c5fd;
     }
+
+    .redirect-links summary {
+      cursor: pointer;
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 600;
+      list-style: none;
+      user-select: none;
+    }
+
+    .redirect-links summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .redirect-links summary::before {
+      content: "▶";
+      display: inline-block;
+      margin-right: 6px;
+      font-size: 9px;
+      transition: transform 0.15s ease;
+    }
+
+    .redirect-links[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .redirect-links summary:hover {
+      color: #93c5fd;
+    }
   </style>
 </head>
 <body onload="loadVersion()">
@@ -1018,15 +1047,28 @@ function renderOverview(data) {
                         ? '<span class="warn" title="' + esc(apple.note) + '">&#9888;</span>'
                         : icon(false))
                     : '<span style="color:#475569;">&#8211;</span>';
-    const linkSourcesHtml = (p.link_sources || []).map(source => `
-      <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
-        Link von:
-        <a href="${esc(source.page_url)}" target="_blank"
-          style="color:#60a5fa;text-decoration:none;">
-          ${esc(source.page_url)}
-        </a>
-        · Ankertext:
-        <span style="color:#fde68a;">„${esc(source.anchor_text || '(kein Ankertext)')}“</span>
+    const linkSources = Array.isArray(p.link_sources)
+      ? p.link_sources
+      : [];
+
+    const linkSourcesHtml = linkSources.map(source => `
+      <div style="font-size:10px;color:#94a3b8;margin-top:6px;">
+        <div>
+          <span style="color:#64748b;">Link von:</span>
+          <a href="${esc(source.page_url || '')}"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="color:#60a5fa;text-decoration:none;word-break:break-all;">
+            ${esc(source.page_url || '(unbekannte Quellseite)')}
+          </a>
+        </div>
+
+        <div style="margin-top:2px;">
+          <span style="color:#64748b;">Ankertext:</span>
+          <span style="color:#fde68a;font-style:italic;">
+            „${esc(source.anchor_text || '(kein Ankertext)')}“
+          </span>
+        </div>
       </div>
     `).join('');
 
@@ -1056,11 +1098,23 @@ function renderOverview(data) {
         <td>${favCell}</td>
         <td>${appleCell}</td>
       </tr>
-      ${Number(p.status_code) === 301 && linkSourcesHtml ? `
+      ${Number(p.status_code) === 301 && linkSources.length > 0 ? `
         <tr>
           <td colspan="11"
               style="padding:2px 12px 8px 48px;background:rgba(255,255,255,0.02);">
-            ${linkSourcesHtml}
+
+            <details class="redirect-links">
+              <summary>
+                ${linkSources.length}
+                ${linkSources.length === 1 ? 'Link' : 'Links'}
+                mit Ankertext anzeigen
+              </summary>
+
+              <div style="padding:6px 0 4px 18px;">
+                ${linkSourcesHtml}
+              </div>
+            </details>
+
           </td>
         </tr>
       ` : ''}
